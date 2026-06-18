@@ -172,6 +172,20 @@ func (cc *ConfigCache) refresh() {
 		return
 	}
 
+	// Filter out REALITY — Flutter client can't handle them yet
+	var noReality []*model.VpnConfig
+	for _, c := range filtered {
+		if c.TLS != "reality" {
+			noReality = append(noReality, c)
+		}
+	}
+	if len(noReality) > 0 {
+		filtered = noReality
+		log.Printf("INFO: %d configs after REALITY filter", len(filtered))
+	} else {
+		log.Println("WARN: all configs are REALITY, keeping them as fallback")
+	}
+
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].LatencyMs < filtered[j].LatencyMs
 	})

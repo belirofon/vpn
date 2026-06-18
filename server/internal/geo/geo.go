@@ -50,18 +50,27 @@ func FilterNonRussia(configs []*model.VpnConfig, g *GeoDB) []*model.VpnConfig {
 		return configs
 	}
 
-	filtered := make([]*model.VpnConfig, 0, len(configs))
+	// First pass: try to get non-RU configs
+	var nonRU, ru, unknown []*model.VpnConfig
 	for _, cfg := range configs {
 		country := g.CountryCode(cfg.Server)
 		cfg.Country = country
-		if country == "" {
-			log.Printf("WARN: unknown country for %s (%s), skipping", cfg.Server, cfg.Name)
-			continue
+		switch country {
+		case "":
+			unknown = append(unknown, cfg)
+		case "RU":
+			ru = append(ru, cfg)
+		default:
+			nonRU = append(nonRU, cfg)
 		}
-		if country == "RU" {
-			continue
-		}
-		filtered = append(filtered, cfg)
 	}
-	return filtered
+
+	// Prefer non-RU, fall back to all if empty
+	if len(nonRU) > 0 {
+		log.Printf("INFO: GeoIP: %d non-RU, %d RU, %d unknown", len(nonRU), len(ru), len(unknown))
+		return nonRU
+	}
+
+	log.Printf("INFO: GeoIP: all configs are RU/unknown (%d RU, %d unknown), using as fallback", len(ru), len(unknown))
+	return append(ru, unknown...)
 }
