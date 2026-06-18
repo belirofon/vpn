@@ -29,21 +29,23 @@ jobs:
 
       - name: Build and restart
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+          DUCK_DNS_TOKEN: ${{ secrets.DUCK_DNS_TOKEN }}
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: ENV_FILE,DUCK_DNS_TOKEN
           script: |
             set -e
             cd ~/vpn-server
 
             # Create .env from secret if missing
             if [ ! -f .env ]; then
-              cat > .env << 'ENVEOF'
-            ${{ secrets.ENV_FILE }}
-            DUCK_DNS_TOKEN=${{ secrets.DUCK_DNS_TOKEN }}
-            ENVEOF
+              printf '%s\n' "$ENV_FILE" > .env
+              echo "DUCK_DNS_TOKEN=$DUCK_DNS_TOKEN" >> .env
               echo "=== .env created ==="
             fi
 
