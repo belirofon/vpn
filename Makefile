@@ -145,14 +145,22 @@ deploy:
 		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY)" \
 		--exclude '.env' \
 		--exclude '.git' \
-		--exclude 'server' \
-		--exclude 'vpn-server' \
-		--exclude 'vpn-test' \
+		--exclude '/server' \
+		--exclude '/vpn-server' \
+		--exclude '/vpn-test' \
 		server/ \
 		$(SSH_USER)@$(SSH_HOST):~/vpn-server/
 	@echo "=== Building and starting Docker container ==="
 	@ssh -p $(SSH_PORT) -i $(SSH_KEY) $(SSH_USER)@$(SSH_HOST) \
-		"cd ~/vpn-server && docker compose build --pull && docker compose up -d"
+		"cd ~/vpn-server && \
+		 if [ ! -f .env ]; then \
+		   cp .env.example .env && \
+		   echo '=== .env CREATED from .env.example — EDIT IT: ssh -p $(SSH_PORT) $(SSH_USER)@$(SSH_HOST) \"nano ~/vpn-server/.env\"' && \
+		   exit 1; \
+		 fi && \
+		 ([ -f GeoLite2-Country.mmdb ] || curl -sL -o GeoLite2-Country.mmdb \
+		   https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb) && \
+		 docker compose build --pull && docker compose up -d"
 	@echo "=== Health check ==="
 	@sleep 3
 	@curl -s --max-time 5 http://$(SSH_HOST):8080/health || echo "WARN: health check failed"
