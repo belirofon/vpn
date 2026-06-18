@@ -1,3 +1,8 @@
 belirofon-vpn.duckdns.org {
+    tls {
+        issuer acme {
+            alt_tlsalpn_port -1
+        }
+    }
     reverse_proxy vpn-server:8080
 }
