@@ -164,10 +164,10 @@ deploy:
 		 docker compose build --pull && docker compose up -d"
 	@echo "=== Waiting for server to initialize (up to 60s) ==="
 	@for i in $$(seq 1 12); do \
-		curl -sf --max-time 5 https://$(DOMAIN)/health > /dev/null 2>&1 || \
+		curl -sf --max-time 5 https://$(DOMAIN):8443/health > /dev/null 2>&1 || \
 		curl -sf --max-time 5 http://$(SSH_HOST):8080/health > /dev/null 2>&1; \
 		if [ $$? -eq 0 ]; then \
-			echo "=== Server is healthy (https://$(DOMAIN)) ===" && exit 0; \
+			echo "=== Server is healthy (https://$(DOMAIN):8443) ===" && exit 0; \
 		fi; \
 		sleep 5; \
 	done; \
