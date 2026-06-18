@@ -16,21 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Package server code
-        run: tar czf /tmp/server.tar.gz -C server/ --exclude='.env' --exclude='.git' --exclude='vpn-server' --exclude='vpn-test' --exclude='server' .
-
-      - name: Copy to server and deploy
+      - name: Copy server code to remote
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: /tmp/server.tar.gz
+          source: server/
           target: ~/vpn-server/
-          strip_components: 2
+          strip_components: 1
 
-      - name: Extract and restart
+      - name: Build and restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -40,8 +37,6 @@ jobs:
           script: |
             set -e
             cd ~/vpn-server
-            tar xzf server.tar.gz
-            rm -f server.tar.gz
 
             # Create .env from secret if missing
             if [ ! -f .env ]; then
