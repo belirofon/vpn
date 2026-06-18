@@ -8,10 +8,6 @@ on:
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: vpn-server
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,23 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: server/
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Deploy to remote server
+      - name: Deploy via rsync + Docker build
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -45,51 +25,57 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+
+            # Create target directory
             mkdir -p ~/vpn-server
 
-            # Seed .env on first deploy
+            # Seed .env from secret on first deploy
             if [ ! -f ~/vpn-server/.env ]; then
               cat > ~/vpn-server/.env << 'ENVEOF'
             ${{ secrets.ENV_FILE }}
             ENVEOF
-              echo ".env created"
+              echo "=== .env created ==="
             fi
 
             # Download GeoIP database if missing
             if [ ! -f ~/vpn-server/GeoLite2-Country.mmdb ]; then
               curl -sL -o ~/vpn-server/GeoLite2-Country.mmdb \
                 "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb"
-              echo "GeoIP database downloaded"
+              echo "=== GeoIP database downloaded ==="
             fi
 
-            # Write docker-compose.yml for CI/CD (pulls pre-built image)
-            cat > ~/vpn-server/docker-compose.yml << 'COMPOSEEOF'
-            services:
-              vpn-server:
-                image: ghcr.io/${{ github.repository }}/vpn-server:latest
-                container_name: vpn-server
-                restart: unless-stopped
-                ports:
-                  - "8080:8080"
-                env_file:
-                  - .env
-                volumes:
-                  - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro
-                logging:
-                  driver: json-file
-                  options:
-                    max-size: "10m"
-                    max-file: "3"
-            COMPOSEEOF
+      - name: Rsync server code
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avz --delete --exclude '.env' --exclude '.git' --exclude '/server'
+          remote_path: ~/vpn-server/
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USER }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Build and restart Docker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
             cd ~/vpn-server
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
+            docker compose build --pull
+            docker compose up -d
 
       - name: Health check
         run: |
-          sleep 5
-          curl -sf --max-time 10 http://${{ secrets.SSH_HOST }}:8080/health \
-            && echo "Health check PASSED" \
-            || echo "WARN: health check failed"
+          echo "Waiting for server to initialize..."
+          for i in $$(seq 1 12); do
+            if curl -sf --max-time 5 http://${{ secrets.SSH_HOST }}:8080/health > /dev/null 2>&1; then
+              echo "=== Server is healthy ==="
+              curl -s http://${{ secrets.SSH_HOST }}:8080/health
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check FAILED"
+          exit 1
