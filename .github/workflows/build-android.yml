@@ -6,13 +6,16 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version tag (e.g., 1.0.0)'
+      tag:
+        description: 'Release tag'
         required: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
 
     steps:
       - name: Checkout
@@ -21,47 +24,48 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
           channel: 'stable'
+          cache: true
 
-      - name: Install dependencies
+      - name: Flutter pub get
         run: flutter pub get
-        working-directory: client
 
       - name: Decode keystore
-        id: decode_keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > client/android/app/keystore.jks
-          echo "keystore_exists=true" >> $GITHUB_OUTPUT
-
-      - name: Build release APK
+        id: keystore
         env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            mkdir -p android/app
+            echo "$KEYSTORE_B64" | base64 -d > android/app/keystore.jks 2>/dev/null && echo "keystore=exists" >> "$GITHUB_OUTPUT" || echo "keystore=none" >> "$GITHUB_OUTPUT"
+          else
+            echo "keystore=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build APK (signed release)
+        if: steps.keystore.outputs.keystore == 'exists'
+        env:
+          ANDROID_KEYSTORE_PATH: android/app/keystore.jks
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          if [ "${{ steps.decode_keystore.outputs.keystore_exists }}" = "true" ]; then
-            flutter build apk --release \
-              --dart-define=SERVER_URL=https://${{ secrets.SERVER_HOST || 'vpn.example.com' }}:8080
-          else
-            flutter build apk --debug \
-              --dart-define=SERVER_URL=https://${{ secrets.SERVER_HOST || 'vpn.example.com' }}:8080
-          fi
-        working-directory: client
+        run: flutter build apk --release
 
-      - name: Get version
-        id: get_version
-        run: |
-          echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-          echo "apk_path=$(find client/build -name '*.apk' -type f | head -1)" >> $GITHUB_OUTPUT
+      - name: Build APK (debug — unsigned)
+        if: steps.keystore.outputs.keystore != 'exists'
+        run: flutter build apk --debug
 
-      - name: Upload APK to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Rename APK for release upload
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/vpn-client-android.apk 2>/dev/null || \
+          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/vpn-client-android.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.get_version.outputs.apk_path }}
-          # Generic name so /releases/latest/download/vpn-client-android.apk always resolves
-          asset_name: vpn-client-android.apk
-          tag: ${{ github.ref }}
-          overwrite: true
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: client/build/app/outputs/flutter-apk/vpn-client-android.apk
