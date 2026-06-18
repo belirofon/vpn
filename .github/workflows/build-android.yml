@@ -30,6 +30,21 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Accept Android licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
+          yes | "$ANDROID_HOME/tools/bin/sdkmanager" --licenses 2>/dev/null || true
+
+      - name: Create local.properties
+        run: |
+          # Gradle reads this from settings.gradle.kts
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
+          cat android/local.properties
+
       - name: Decode keystore
         id: keystore
         env:
