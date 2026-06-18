@@ -1,10 +1,35 @@
 services:
+  # DuckDNS: auto-updates IP for belirofon-vpn.duckdns.org
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    restart: unless-stopped
+    environment:
+      - SUBDOMAINS=belirofon-vpn
+      - TOKEN=${DUCK_DNS_TOKEN}
+      - LOG_FILE=false
+
+  # Caddy: reverse proxy with auto-HTTPS (Let's Encrypt)
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - vpn-server
+
+  # Go server (internal, accessed via Caddy reverse proxy)
   vpn-server:
     build: .
     container_name: vpn-server
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     env_file:
       - .env
     volumes:
@@ -17,3 +42,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  caddy_data:

@@ -134,6 +134,7 @@ SSH_HOST    ?= 162.248.227.46
 SSH_PORT    ?= 1337
 SSH_USER    ?= pilot
 SSH_KEY     ?= $(HOME)/.ssh/id_ed25519
+DOMAIN      ?= belirofon-vpn.duckdns.org
 # Build Docker image locally
 docker-build:
 	docker build -t vpn-server server/
@@ -163,8 +164,11 @@ deploy:
 		 docker compose build --pull && docker compose up -d"
 	@echo "=== Waiting for server to initialize (up to 60s) ==="
 	@for i in $$(seq 1 12); do \
-		curl -sf --max-time 5 http://$(SSH_HOST):8080/health > /dev/null 2>&1 && \
-		echo "=== Server is healthy ===" && exit 0; \
+		curl -sf --max-time 5 https://$(DOMAIN)/health > /dev/null 2>&1 || \
+		curl -sf --max-time 5 http://$(SSH_HOST):8080/health > /dev/null 2>&1; \
+		if [ $$? -eq 0 ]; then \
+			echo "=== Server is healthy (https://$(DOMAIN)) ===" && exit 0; \
+		fi; \
 		sleep 5; \
 	done; \
 	echo "WARN: health check timeout"

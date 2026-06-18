@@ -1,0 +1,3 @@
+belirofon-vpn.duckdns.org {
+    reverse_proxy vpn-server:8080
+}

@@ -42,6 +42,7 @@ jobs:
             if [ ! -f .env ]; then
               cat > .env << 'ENVEOF'
             ${{ secrets.ENV_FILE }}
+            DUCK_DNS_TOKEN=${{ secrets.DUCK_DNS_TOKEN }}
             ENVEOF
               echo "=== .env created ==="
             fi
@@ -57,12 +58,19 @@ jobs:
             docker compose up -d
 
       - name: Health check
+        env:
+          DOMAIN: belirofon-vpn.duckdns.org
         run: |
           echo "Waiting for server to initialize..."
           for i in $(seq 1 12); do
+            if curl -sf --max-time 5 https://$DOMAIN/health > /dev/null 2>&1; then
+              echo "=== Server is healthy (https://$DOMAIN) ==="
+              curl -s https://$DOMAIN/health
+              exit 0
+            fi
+            # Fallback: direct HTTP on port 8080
             if curl -sf --max-time 5 http://${{ secrets.SSH_HOST }}:8080/health > /dev/null 2>&1; then
-              echo "=== Server is healthy ==="
-              curl -s http://${{ secrets.SSH_HOST }}:8080/health
+              echo "=== Server is healthy (HTTP fallback) ==="
               exit 0
             fi
             sleep 5
