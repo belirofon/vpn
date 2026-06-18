@@ -61,6 +61,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.get_version.outputs.apk_path }}
-          asset_name: vpn-client-android-${{ steps.get_version.outputs.version }}.apk
+          # Generic name so /releases/latest/download/vpn-client-android.apk always resolves
+          asset_name: vpn-client-android.apk
           tag: ${{ github.ref }}
           overwrite: true

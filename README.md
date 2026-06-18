@@ -225,8 +225,8 @@ The Flutter client is a cross-platform mobile app that connects to the VPN serve
 
 | Platform | Download | Build Command |
 |---|---|---|
-| <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" /> | [Download APK v1.0.0](https://github.com/belirofon/vpn/releases/download/v1.0.0/vpn-client-android-v1.0.0.apk) | `make build-android-release` |
-| <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" /> | [Download IPA v1.0.0](https://github.com/belirofon/vpn/releases/download/v1.0.0/vpn-client-ios-v1.0.0.ipa) | `make build-ios-release` |
+| <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" /> | [Download APK (latest)](https://github.com/belirofon/vpn/releases/latest/download/vpn-client-android.apk) | `make build-android-release` |
+| <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" /> | [Download IPA (latest)](https://github.com/belirofon/vpn/releases/latest/download/vpn-client-ios.ipa) | `make build-ios-release` |
 | <img src="https://img.shields.io/badge/Web-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Web" /> | Runs via `make dev-mock` | `flutter run -d chrome` |
 
 </div>
