@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  vpn-server:
+    build: .
+    container_name: vpn-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro
+    environment:
+      - SKIP_DOTENV=true
+      - GEOIP_DB_PATH=/app/GeoLite2-Country.mmdb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

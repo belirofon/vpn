@@ -1,0 +1,35 @@
+# Environment
+.env
+
+# Go — compiled binaries
+server/server
+server/vpn-server
+
+# GeoIP database (auto-downloaded by make build-server)
+server/GeoLite2-Country.mmdb
+
+# Flutter
+client/build/
+client/.dart_tool/
+client/.packages
+client/.flutter-plugins-dependencies
+client/flutter_01.log
+client/android/.gradle/
+client/android/build/
+client/android/local.properties
+client/ios/Pods/
+client/ios/.symlinks/
+client/ios/Flutter/ephemeral/
+client/ios/Flutter/flutter_export_environment.sh
+
+# Local Android SDK (2.6GB, not for git)
+android-sdk/
+
+# Internal plan — not needed in repo
+PLAN.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

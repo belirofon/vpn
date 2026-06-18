@@ -1,0 +1,6 @@
+.env
+.git
+*.md
+test_integration.sh
+Dockerfile
+docker-compose.yml
