@@ -16,7 +16,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via rsync + Docker build
+      - name: Package server code
+        run: tar czf /tmp/server.tar.gz -C server/ --exclude='.env' --exclude='.git' --exclude='vpn-server' --exclude='vpn-test' --exclude='server' .
+
+      - name: Copy to server and deploy
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: /tmp/server.tar.gz
+          target: ~/vpn-server/
+          strip_components: 2
+
+      - name: Extract and restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -25,44 +39,25 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+            cd ~/vpn-server
+            tar xzf server.tar.gz
+            rm -f server.tar.gz
 
-            # Create target directory
-            mkdir -p ~/vpn-server
-
-            # Seed .env from secret on first deploy
-            if [ ! -f ~/vpn-server/.env ]; then
-              cat > ~/vpn-server/.env << 'ENVEOF'
+            # Create .env from secret if missing
+            if [ ! -f .env ]; then
+              cat > .env << 'ENVEOF'
             ${{ secrets.ENV_FILE }}
             ENVEOF
               echo "=== .env created ==="
             fi
 
             # Download GeoIP database if missing
-            if [ ! -f ~/vpn-server/GeoLite2-Country.mmdb ]; then
-              curl -sL -o ~/vpn-server/GeoLite2-Country.mmdb \
+            if [ ! -f GeoLite2-Country.mmdb ]; then
+              curl -sL -o GeoLite2-Country.mmdb \
                 "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb"
               echo "=== GeoIP database downloaded ==="
             fi
 
-      - name: Rsync server code
-        uses: burnett01/rsync-deployments@7.0.2
-        with:
-          switches: -avz --delete --exclude '.env' --exclude '.git' --exclude '/server'
-          remote_path: ~/vpn-server/
-          remote_host: ${{ secrets.SSH_HOST }}
-          remote_port: ${{ secrets.SSH_PORT }}
-          remote_user: ${{ secrets.SSH_USER }}
-          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Build and restart Docker
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/vpn-server
             docker compose build --pull
             docker compose up -d
 
