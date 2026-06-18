@@ -9,7 +9,11 @@ class ApiClient {
   SharedPreferences? _prefs;
 
   static String? _webUrl;
-  static const String _defaultWebUrl = 'http://localhost:8080';
+  // Debug: localhost (for local dev with mock server)
+  // Release: production server (overridable via --dart-define=SERVER_URL or debug menu)
+  static const String _defaultWebUrl = kReleaseMode
+      ? 'https://belirofon-vpn.duckdns.org:8443'
+      : 'http://localhost:8080';
   static const String _baseUrlKey = 'server_url';
 
   ApiClient(this._dio);

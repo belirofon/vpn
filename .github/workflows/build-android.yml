@@ -57,7 +57,7 @@ jobs:
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=SERVER_URL=https://belirofon-vpn.duckdns.org:8443
 
       - name: Build APK (debug — unsigned)
         if: steps.keystore.outputs.keystore != 'exists'

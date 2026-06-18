@@ -412,7 +412,7 @@ class _DebugSheetState extends State<_DebugSheet> {
           TextField(
             controller: _urlController,
             decoration: InputDecoration(
-              hintText: 'http://localhost:8080',
+              hintText: 'https://belirofon-vpn.duckdns.org:8443',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
