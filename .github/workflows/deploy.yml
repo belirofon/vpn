@@ -59,7 +59,7 @@ jobs:
       - name: Health check
         run: |
           echo "Waiting for server to initialize..."
-          for i in $$(seq 1 12); do
+          for i in $(seq 1 12); do
             if curl -sf --max-time 5 http://${{ secrets.SSH_HOST }}:8080/health > /dev/null 2>&1; then
               echo "=== Server is healthy ==="
               curl -s http://${{ secrets.SSH_HOST }}:8080/health
