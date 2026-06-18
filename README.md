@@ -33,13 +33,14 @@
 | **Subscription Fetcher** | Fetches proxy configs from your subscription URL (base64, JSON, or plain text) |
 | **Protocol Parser** | Parses **VLESS**, **VMess**, **Trojan**, and **Shadowsocks** links |
 | **Connectivity Tester** | Pings each server with real protocol handshakes (TCP, TLS, WebSocket, VLESS proxy) |
-| **Geo-Filter** | Filters out Russian servers using MaxMind GeoLite2 database |
+| **Geo-Filter** | Prefers non-Russian servers with fallback to all configs |
 | **Auto-Select Best** | Returns the lowest-latency working config |
 | **Auto-HTTPS** | Caddy reverse proxy with Let's Encrypt certificates |
 | **DuckDNS** | Auto-updates DNS record for your domain |
 | **Flutter Client** | Android & iOS app with one-tap connect/disconnect |
 | **Refresh API** | Trigger config cache refresh on demand |
 | **Periodic Updates** | Auto-refreshes config cache every `N` minutes |
+| **REALITY Filter** | Skips VLESS+REALITY configs (not yet supported by Flutter client) |
 
 ## 🏗️ Architecture
 
@@ -308,12 +309,15 @@ This will:
 
 ### CI/CD (GitHub Actions)
 
-On every push to `main`/`master` that modifies `server/**` or `.github/workflows/deploy.yml`:
+| Workflow | Trigger | Action |
+|---|---|---|
+| **Deploy** | Push to `master` changing `server/**` | SCP → Docker build → restart → health check |
+| **Build Android** | Push tag `v*` | Build APK → Create Release → Upload asset |
 
-1. Checkout code
-2. SCP to server
-3. Build & restart Docker containers
-4. Health check via `https://<domain>:8443/health`
+The latest Android APK is always available at:
+```
+https://github.com/belirofon/vpn/releases/latest/download/vpn-client-android.apk
+```
 
 ## 🧪 Testing
 
@@ -400,12 +404,14 @@ make run-server SUBSCRIPTION_URL="your_subscription_url"
 
 - [x] Multi-protocol parser (VLESS, VMess, Trojan, SS)
 - [x] Connectivity tester with real protocol handshakes
-- [x] GeoIP filtering (exclude Russian servers)
+- [x] GeoIP filtering with non-RU preference + RU fallback
 - [x] DuckDNS auto DNS update
-- [x] Caddy reverse proxy with auto-HTTPS
-- [x] Flutter mobile client (Android + iOS)
-- [x] CI/CD deployment pipeline
-- [ ] Automated release builds for Android/iOS
+- [x] Caddy reverse proxy with auto-HTTPS (Let's Encrypt HTTP-01)
+- [x] Flutter mobile client (Android — working, iOS — requires Apple Developer)
+- [x] CI/CD deployment pipeline (Docker + GitHub Actions)
+- [x] GitHub Actions: automated Android APK builds on tag push
+- [x] REALITY filter (skip unsupported configs for Flutter client)
+- [ ] REALITY support in Flutter client (uTLS/Xray)
 - [ ] Push notifications for config updates
 - [ ] Multi-user support (per-user config cache)
 - [ ] WireGuard protocol support
