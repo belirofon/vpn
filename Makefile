@@ -161,9 +161,13 @@ deploy:
 		 ([ -f GeoLite2-Country.mmdb ] || curl -sL -o GeoLite2-Country.mmdb \
 		   https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb) && \
 		 docker compose build --pull && docker compose up -d"
-	@echo "=== Health check ==="
-	@sleep 3
-	@curl -s --max-time 5 http://$(SSH_HOST):8080/health || echo "WARN: health check failed"
+	@echo "=== Waiting for server to initialize (up to 60s) ==="
+	@for i in $$(seq 1 12); do \
+		curl -sf --max-time 5 http://$(SSH_HOST):8080/health > /dev/null 2>&1 && \
+		echo "=== Server is healthy ===" && exit 0; \
+		sleep 5; \
+	done; \
+	echo "WARN: health check timeout"
 
 # Restart container on remote (rebuilds if code changed)
 deploy-restart:
