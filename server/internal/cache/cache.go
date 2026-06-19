@@ -20,6 +20,7 @@ type ConfigCache struct {
 	statusMsg  string
 	configs    []model.VpnConfig
 	updated    time.Time
+	startedAt  time.Time
 	cfg        config.Config
 	geo        *geo.GeoDB
 	ticker     *time.Ticker
@@ -28,10 +29,11 @@ type ConfigCache struct {
 
 func NewCache(cfg config.Config, g *geo.GeoDB) *ConfigCache {
 	return &ConfigCache{
-		cfg:    cfg,
-		geo:    g,
-		stopCh: make(chan struct{}),
-		status: model.StatusLoading,
+		cfg:       cfg,
+		geo:       g,
+		stopCh:    make(chan struct{}),
+		status:    model.StatusLoading,
+		startedAt: time.Now(),
 	}
 }
 
@@ -97,6 +99,42 @@ func (cc *ConfigCache) Start() {
 
 func (cc *ConfigCache) Stop() {
 	close(cc.stopCh)
+}
+
+func (cc *ConfigCache) GetStartedAt() time.Time {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.startedAt
+}
+
+func (cc *ConfigCache) SetSubscriptionURL(url string) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.cfg.SubscriptionURL = url
+}
+
+func (cc *ConfigCache) SetRefreshInterval(d time.Duration) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.cfg.RefreshInterval = d
+	// Restart ticker with new interval
+	if cc.ticker != nil {
+		cc.ticker.Stop()
+	}
+	if d > 0 {
+		cc.ticker = time.NewTicker(d)
+		go func() {
+			for {
+				select {
+				case <-cc.ticker.C:
+					cc.refresh()
+				case <-cc.stopCh:
+					cc.ticker.Stop()
+					return
+				}
+			}
+		}()
+	}
 }
 
 func (cc *ConfigCache) Refresh() {

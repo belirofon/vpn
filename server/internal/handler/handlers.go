@@ -5,10 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"vpn-server/internal/cache"
+	"vpn-server/internal/config"
 	"vpn-server/internal/model"
 )
 
-func SetupRoutes(r *gin.Engine, c *cache.ConfigCache) {
+func SetupRoutes(r *gin.Engine, c *cache.ConfigCache, cfg *config.Config) {
 	r.GET("/health", func(ctx *gin.Context) {
 		status, msg := c.Status()
 		ctx.JSON(http.StatusOK, model.StatusResponse{
@@ -93,4 +94,6 @@ func SetupRoutes(r *gin.Engine, c *cache.ConfigCache) {
 			}
 		})
 	}
+
+	SetupAdminRoutes(r, cfg, c)
 }

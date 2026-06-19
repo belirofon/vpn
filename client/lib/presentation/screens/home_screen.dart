@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models/vpn_config.dart';
 import '../../core/vpn/vpn_service.dart';
+import '../widgets/server_info_card.dart';
+import '../widgets/debug_sheet.dart';
+import 'admin_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -108,7 +111,16 @@ class _HomeScreenState extends State<HomeScreen>
   void _showDebugMenu() {
     showModalBottomSheet(
       context: context,
-      builder: (_) => _DebugSheet(apiClient: widget.apiClient),
+      builder: (_) => DebugSheet(apiClient: widget.apiClient),
+    );
+  }
+
+  void _openAdminLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminLoginScreen(apiClient: widget.apiClient),
+      ),
     );
   }
 
@@ -127,6 +139,13 @@ class _HomeScreenState extends State<HomeScreen>
       appBar: AppBar(
         title: const Text('VPN Client'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Admin',
+            onPressed: _openAdminLogin,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -186,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 8),
                 // Server info
                 if (_activeConfig != null)
-                  _ServerInfoCard(config: _activeConfig!),
+                  ServerInfoCard(config: _activeConfig!),
                 // Error message
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
@@ -279,167 +298,5 @@ class _HomeScreenState extends State<HomeScreen>
       VpnConnectionState.error => 'Error',
       VpnConnectionState.disconnected => 'Disconnected',
     };
-  }
-}
-
-// -- Server info card --
-
-class _ServerInfoCard extends StatelessWidget {
-  final VpnConfig config;
-
-  const _ServerInfoCard({required this.config});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.dns_outlined, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(config.name, style: theme.textTheme.bodyLarge),
-            const SizedBox(width: 4),
-            Text(
-              '(${config.country})',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-            const SizedBox(width: 16),
-            Icon(Icons.speed, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 4),
-            Text(
-              '${config.latencyMs}ms',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// -- Debug settings sheet --
-
-class _DebugSheet extends StatefulWidget {
-  final ApiClient apiClient;
-
-  const _DebugSheet({required this.apiClient});
-
-  @override
-  State<_DebugSheet> createState() => _DebugSheetState();
-}
-
-class _DebugSheetState extends State<_DebugSheet> {
-  late TextEditingController _urlController;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController = TextEditingController(
-      text: widget.apiClient.serverUrl ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveUrl() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-
-    setState(() => _isSaving = true);
-    await widget.apiClient.saveServerUrl(url);
-
-    if (mounted) {
-      setState(() => _isSaving = false);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Server URL saved'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 24,
-        right: 24,
-        top: 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.build_outlined, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Debug Settings',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Server URL',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _urlController,
-            decoration: InputDecoration(
-              hintText: 'https://belirofon-vpn.duckdns.org:8443',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _isSaving ? null : _saveUrl,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('SAVE'),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
   }
 }

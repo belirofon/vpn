@@ -19,37 +19,33 @@
 - [x] **Caddyfile** — домен читается из `{$DOMAIN}` (env)
 - [x] **docker-compose** — Caddy получает `DOMAIN`, DuckDNS парсит subdomain
 - [x] **build-android.yml** — `SERVER_URL` через `vars.SERVER_URL`
-- [x] **deploy.yml** — `DOMAIN` через `vars.DOMAIN`
+- [x] **deploy.yml** — `DOMAIN` через `vars.DOMAIN`, SUBDOMAIN вычисляется
 - [x] **Makefile** — `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `DOMAIN` больше не захордкожены
 
 ---
 
-## ⬜ Фаза 1 — Тесты (High Priority)
+## ✅ Фаза 1 — Тесты — ВЫПОЛНЕНО
 
-Самый критичный пробел проекта. Без тестов нет уверенности в рефакторинге и новых фичах.
+### Go unit-тесты (48 тестов, 5 файлов)
+- [x] **parser** (24 теста) — парсинг VLESS, VMess, Trojan, SS; подписки base64/JSON/plain; edge cases
+- [x] **resolver** (4 теста) — localhost, loopback, invalid domain, empty host
+- [x] **geo** (6 тестов) — nil DB, пустой список, все non-RU, invalid IP
+- [x] **config** (4 теста) — parseDotEnv (normal, quoted, whitespace, malformed), LoadConfig defaults/env
+- [x] **tester** (6 тестов) — ParseUUID (valid, zeros, Fs, invalid length, random), unhex
 
-### Go unit-тесты (минимум)
-- [ ] **parser** — `TEST(ParseConfigLink)` для vless, vmess, trojan, ss; `TEST(ParseSubscription)` для base64/JSON/plain
-- [ ] **resolver** — `TEST(ResolveIP)` с мок-резолвером
-- [ ] **geo** — `TEST(FilterNonRussia)` с мок-GeoDB
-- [ ] **config** — `TEST(ParseDotEnv)` с разными форматами строк
-- [ ] **tester** — `TEST(ParseUUID)` для корректности 16-байтного UUID
+### Dart тесты (13 тестов, 2 файла)
+- [x] **VpnConfig.fromJson / toJson / fromRawLink** (8 тестов)
+- [x] **WidgetTest** (5 тестов) — states: disconnected, connecting error, debug menu, title
 
-### Go integration
-- [ ] **Добавить `golangci-lint` в CI** — перед deploy workflow
-- [ ] **Добавить `go test` в CI** — `go test ./internal/...`
-
-### Dart тесты
-- [ ] **VpnConfig** — `TEST(fromJson)`, `TEST(toJson)`, `TEST(fromRawLink)`
-- [ ] **ApiClient** — unit-тесты с мок-ответами (mockito/mocktail)
-- [ ] **WidgetTest** — `TEST(HomeScreen)` — проверка отображения состояний
-- [ ] **Добавить `flutter analyze` в CI**
+### CI
+- [ ] **Добавить `go test` в CI** — перед deploy workflow
+- [ ] **Добавить `flutter analyze` и `flutter test` в CI**
+- [ ] **Добавить `golangci-lint` в CI**
 
 ---
 
-## ⬜ Фаза 2 — Архитектура
+## ⬜ Фаза 2 — Архитектура (Go server)
 
-### Сервер (Go)
 - [ ] **Рефакторинг `cache.refresh()`** — выделить пайплайн:
   - `fetcher.Fetch()` → `parser.ParseAll()` → `tester.TestAll()` → `geo.Filter()` → `reality.Filter()` → `sort.ByLatency()`
   - Каждый шаг — отдельный публичный метод
@@ -58,7 +54,10 @@
 - [ ] **Добавить `net.Resolver` с DoH** — опциональный DNS-over-HTTPS для резолва
 - [ ] **Обновить/удалить устаревший `docker-compose.prod.yml`**
 
-### Клиент (Flutter/Dart)
+---
+
+## ⬜ Фаза 3 — Архитектура (Flutter client)
+
 - [ ] **Решить судьбу `domain/`**:
   - Вариант A: удалить пустую директорию
   - Вариант B: имплементировать `GetBestConfigUseCase`, `ConnectToVpnUseCase`
@@ -71,7 +70,7 @@
 
 ---
 
-## ⬜ Фаза 3 — Code Quality & Cleanup
+## ⬜ Фаза 4 — Code Quality & Cleanup
 
 ### Разделение home_screen.dart
 - [ ] Вынести `_ServerInfoCard` → `presentation/widgets/server_info_card.dart`
@@ -88,7 +87,40 @@
 
 ---
 
-## ⬜ Фаза 4 — Нереализованные фичи (из PLAN.md Roadmap)
+## ⬜ Фаза 5 — Админ-панель в клиенте
+
+### Сервер (добавить эндпоинты)
+- [ ] **POST /api/admin/login** — авторизация админа (email + пароль из .env, отдаёт JWT или token)
+- [ ] **GET /api/admin/health** — расширенный health (статус сервера, время работы, кол-во конфигов)
+- [ ] **GET /api/admin/endpoints** — список всех доступных эндпоинтов сервера
+- [ ] **POST /api/admin/refresh-configs** — принудительный refresh конфигов (сейчас есть, но без auth)
+- [ ] **PUT /api/admin/config** — обновить `SUBSCRIPTION_URL` и `REFRESH_INTERVAL` (сохранить в .env или в runtime)
+
+### Авторизация
+- [ ] **Добавить `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env.example`** и в `config.go`
+- [ ] **Middleware проверки токена** для /api/admin/* эндпоинтов
+
+### Клиент — экран входа
+- [ ] **Создать `presentation/screens/admin_login_screen.dart`** — форма email + пароль
+- [ ] **Добавить кнопку входа на главном экране** (иконка/шестерёнка или Long-press, как DebugSheet)
+- [ ] **Сохранять токен в SharedPreferences** после успешного входа
+
+### Клиент — админ-панель
+- [ ] **Создать `presentation/screens/admin_panel_screen.dart`** — главный экран админа
+- [ ] **Карточка Health** — статус сервера, uptime, кол-во конфигов (GET /api/admin/health)
+- [ ] **Карточка Endpoints** — список всех эндпоинтов сервера (GET /api/admin/endpoints)
+- [ ] **Карточка Subscription** — просмотр и редактирование SUBSCRIPTION_URL
+- [ ] **Карточка Refresh Interval** — просмотр и редактирование REFRESH_INTERVAL
+- [ ] **Кнопка "Refresh Configs Now"** — POST /api/admin/refresh-configs
+- [ ] **Кнопка "Logout"** — сброс токена, возврат на главную
+
+### Разделение экранов
+- [ ] **Вынести DebugSheet** из `home_screen.dart` → `presentation/widgets/debug_sheet.dart`
+- [ ] **Вынести ServerInfoCard** из `home_screen.dart` → `presentation/widgets/server_info_card.dart`
+
+---
+
+## ⬜ Фаза 6 — Нереализованные фичи (из PLAN.md Roadmap)
 
 - [ ] **Выбор конкретного сервера из списка** — продвинутый режим, показать все конфиги и дать выбрать вручную
 - [ ] **Поддержка REALITY в Flutter клиенте** — требует uTLS/Xray core (Go 1.24+)
@@ -103,28 +135,27 @@
 ## Приоритет выполнения
 
 ```
-1. ✅ Фаза 0 — Безопасность              (выполнено)
-2. ✅ Фаза 0.5 — Убрать хардкод домена    (выполнено)
-3. 🔴 Фаза 1 — Тесты                      (следующий шаг)
-4. 🟡 Фаза 2 — Архитектура                (после тестов)
-5. 🟡 Фаза 3 — Code Quality               (параллельно с Фазой 2)
-6. 🟢 Фаза 4 — Новые фичи                 (после стабилизации)
+1. ✅ Фаза 0 — Безопасность               (выполнено)
+2. ✅ Фаза 0.5 — Хардкод домена            (выполнено)
+3. ✅ Фаза 1 — Тесты                       (выполнено)
+4. 🔴 Фаза 5 — Админ-панель               (следующий шаг)
+5. 🟡 Фаза 2 — Архитектура Go             (после админки)
+6. 🟡 Фаза 3 — Архитектура Flutter        (после админки)
+7. 🟡 Фаза 4 — Code Quality               (параллельно)
+8. 🟢 Фаза 6 — Новые фичи                 (после стабилизации)
 ```
 
-### Быстрые победы (1-2 часа) — сделано ✅
-- ~~SCRUB credentials из PLAN.md~~ ✅
-- ~~README `/health` status fix~~ ✅
-- ~~Убрать хардкод домена~~ ✅
-- ~~CORS конфигурация~~ ✅
+### Быстрые победы (1-2 часа)
 - `link.hashCode` → `server:port`
 - `parseDotEnv` Windows `\r\n`
 - Удалить пустую `domain/`
 - `docker-compose.prod.yml` cleanup
+- DebugSheet вынести из `home_screen.dart`
 
 ### Средний приоритет (2-8 часов)
-- Unit-тесты parser, resolver, geo
+- Админ-панель: серверные эндпоинты (login, health, endpoints, config)
+- Админ-панель: UI клиента (логин, панель, карточки)
 - `golangci-lint` + `flutter analyze` в CI
-- Разделение home_screen.dart
 - REALITY filter вынести из cache.refresh()
 - Exponential backoff в fetcher
 

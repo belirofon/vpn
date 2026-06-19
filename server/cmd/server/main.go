@@ -43,7 +43,7 @@ func main() {
 	r := gin.Default()
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 
-	handler.SetupRoutes(r, cache)
+	handler.SetupRoutes(r, cache, &cfg)
 
 	// HTTP server
 	srv := &http.Server{
@@ -84,7 +84,7 @@ func corsMiddleware(origins string) gin.HandlerFunc {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origins)
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
