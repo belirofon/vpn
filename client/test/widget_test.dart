@@ -89,7 +89,7 @@ void main() {
     });
 
     /// Pumps twice to fully initialize HomeScreen (initState → _fetchConfigs → rebuild).
-    Future<void> _pumpHomeScreen(WidgetTester tester) async {
+    Future<void> pumpHomeScreen(WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -105,7 +105,7 @@ void main() {
     }
 
     testWidgets('shows disconnected state initially', (tester) async {
-      await _pumpHomeScreen(tester);
+      await pumpHomeScreen(tester);
 
       expect(find.text('Disconnected'), findsOneWidget);
       expect(find.text('CONNECT'), findsOneWidget);
@@ -113,7 +113,7 @@ void main() {
     });
 
     testWidgets('shows error state when no server available', (tester) async {
-      await _pumpHomeScreen(tester);
+      await pumpHomeScreen(tester);
 
       // Tap connect button — fails because no configs available
       await tester.tap(find.text('CONNECT'));
@@ -123,7 +123,7 @@ void main() {
     });
 
     testWidgets('debug menu opens on long press', (tester) async {
-      await _pumpHomeScreen(tester);
+      await pumpHomeScreen(tester);
 
       // Long press the shield icon
       await tester.longPress(find.byIcon(Icons.shield_outlined));
@@ -134,7 +134,7 @@ void main() {
     });
 
     testWidgets('shows app title', (tester) async {
-      await _pumpHomeScreen(tester);
+      await pumpHomeScreen(tester);
 
       expect(find.text('VPN Client'), findsOneWidget);
     });
