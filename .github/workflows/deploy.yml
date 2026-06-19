@@ -66,22 +66,23 @@ jobs:
             docker compose up -d
 
       - name: Health check
-        env:
-          DOMAIN: ${{ vars.DOMAIN }}
-        run: |
-          echo "Waiting for server to initialize..."
-          for i in $(seq 1 12); do
-            if curl -sf --max-time 5 https://$DOMAIN:8443/health > /dev/null 2>&1; then
-              echo "=== Server is healthy (https://$DOMAIN:8443) ==="
-              curl -s https://$DOMAIN:8443/health
-              exit 0
-            fi
-            # Fallback: direct HTTP on port 8080
-            if curl -sf --max-time 5 http://${{ secrets.SSH_HOST }}:8080/health > /dev/null 2>&1; then
-              echo "=== Server is healthy (HTTP fallback) ==="
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Health check FAILED"
-          exit 1
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/vpn-server
+            echo "Waiting for server to initialize..."
+            for i in $(seq 1 12); do
+              if docker compose exec -T vpn-server wget -qO- http://localhost:8080/health > /dev/null 2>&1; then
+                echo "=== Server is healthy ==="
+                docker compose exec -T vpn-server wget -qO- http://localhost:8080/health
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "Health check FAILED"
+            exit 1
