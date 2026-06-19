@@ -9,12 +9,9 @@ class ApiClient {
   SharedPreferences? _prefs;
 
   static String? _webUrl;
-  // Default URL is always localhost (for local dev with mock server).
-  // In production, SERVER_URL MUST be set via --dart-define at build time:
-  //   flutter build apk --dart-define=SERVER_URL=https://your-domain.com:8443
-  // Or changed at runtime via long-press debug menu (persisted to SharedPreferences).
   static const String _defaultWebUrl = 'http://localhost:8080';
   static const String _baseUrlKey = 'server_url';
+  static const String _adminTokenKey = 'admin_token';
 
   ApiClient(this._dio);
 
@@ -45,7 +42,166 @@ class ApiClient {
     return _baseUrl ?? _defaultWebUrl;
   }
 
-  // -- API methods --
+  // -- Admin auth --
+
+  Future<String?> getAdminToken() async {
+    return _prefs?.getString(_adminTokenKey);
+  }
+
+  Future<void> _saveAdminToken(String token) async {
+    await _prefs?.setString(_adminTokenKey, token);
+  }
+
+  Future<void> clearAdminToken() async {
+    await _prefs?.remove(_adminTokenKey);
+  }
+
+  Map<String, dynamic> _authHeaders(String? token) {
+    if (token == null) return {};
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  // -- Admin API methods --
+
+  Future<String?> adminLogin(String email, String password) async {
+    final url = serverUrl;
+    if (url == null) return null;
+
+    try {
+      final response = await _dio.post(
+        '$url/api/admin/login',
+        data: {'email': email, 'password': password},
+      );
+      if (response.statusCode == 200 && response.data['token'] != null) {
+        final token = response.data['token'] as String;
+        await _saveAdminToken(token);
+        return token;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminLogin error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> adminHealth() async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return null;
+
+    try {
+      final response = await _dio.get(
+        '$url/api/admin/health',
+        options: Options(headers: _authHeaders(token)),
+      );
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminHealth error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> adminEndpoints() async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return null;
+
+    try {
+      final response = await _dio.get(
+        '$url/api/admin/endpoints',
+        options: Options(headers: _authHeaders(token)),
+      );
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminEndpoints error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> adminGetConfig() async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return null;
+
+    try {
+      final response = await _dio.get(
+        '$url/api/admin/config',
+        options: Options(headers: _authHeaders(token)),
+      );
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminGetConfig error: $e');
+      return null;
+    }
+  }
+
+  Future<bool> adminUpdateConfig({
+    String? subscriptionUrl,
+    String? refreshInterval,
+  }) async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return false;
+
+    try {
+      final data = <String, dynamic>{};
+      if (subscriptionUrl != null) data['subscription_url'] = subscriptionUrl;
+      if (refreshInterval != null) data['refresh_interval'] = refreshInterval;
+
+      final response = await _dio.put(
+        '$url/api/admin/config',
+        data: data,
+        options: Options(headers: _authHeaders(token)),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminUpdateConfig error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminRefreshConfigs() async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return false;
+
+    try {
+      final response = await _dio.post(
+        '$url/api/admin/refresh-configs',
+        options: Options(headers: _authHeaders(token)),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminRefreshConfigs error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminLogout() async {
+    final url = serverUrl;
+    final token = await getAdminToken();
+    if (url == null || token == null) return false;
+
+    try {
+      await _dio.post(
+        '$url/api/admin/logout',
+        options: Options(headers: _authHeaders(token)),
+      );
+    } catch (_) {}
+    await clearAdminToken();
+    return true;
+  }
+
+  // -- Public API methods --
 
   Future<VpnConfig?> getBestConfig() async {
     final url = serverUrl;

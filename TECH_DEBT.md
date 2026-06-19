@@ -18,9 +18,10 @@
 
 ### Тесты
 
-- **Нет unit-тестов Go** — ни одного `_test.go` файла. Парсер, резолвер, geo — ключевые модули без покрытия.
-- **Нет линтера в CI** — ни `golangci-lint` для Go, ни `dart analyze` для Flutter.
-- **widget_test.dart пустой** — `expect(true, isTrue)`.
+- ✅ **Нет unit-тестов Go** — добавлено 48 тестов (parser, resolver, geo, config, tester).
+- ✅ **Нет `dart analyze` в CI** — `flutter analyze` добавлен в деплой workflow.
+- **Нет `golangci-lint` в CI** — только Go unit-тесты в CI.
+- ✅ **widget_test.dart пустой** — 13 Dart тестов (8 model + 5 widget).
 
 ---
 
@@ -34,7 +35,7 @@
 
 ### Клиент
 
-- **`home_screen.dart` — 445 строк, 3 виджета** — `HomeScreen` + `_ServerInfoCard` + `_DebugSheet` в одном файле. Разнести по отдельным файлам.
+- ✅ **`home_screen.dart` — 445 строк, 3 виджета** — `_ServerInfoCard` и `_DebugSheet` вынесены в `widgets/`.
 - **Нет `initialize()` в интерфейсе `VpnService`** — `MobileVpnService` добавляет метод не реализуя абстракцию. Клиентский код вынужден делать `as MobileVpnService`.
 - **`link.hashCode.toString()` как id** — в `VpnConfig.fromRawLink()`. Коллизии возможны. Нужен стабильный id на основе server:port.
 
@@ -48,6 +49,7 @@
 
 - **Магические строки в UI** — "Server unavailable.\nCheck that the server is running." и другие строки в `home_screen.dart`. Вынести в константы.
 - **Error handling в ApiClient теряет контекст** — все методы возвращают `null/[]` при ошибке вместо `Result<T>` или кастомного исключения.
+- **Нет кеширования списка конфигов** — список топ-10 загружается с сервера при каждом открытии HomeScreen. Можно добавить локальное кеширование.
 
 ---
 
@@ -60,6 +62,7 @@
 - **docker-compose.prod.yml устарел** — использует `version: "3.9"` (deprecated) и не синхронизирован с основным `docker-compose.yml`.
 - **build-ios.yml нерабочий в GitHub Actions** — требует self-hosted macOS runner.
 - **Makefile содержал credentials сервера** — `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `DOMAIN` были захордкожены. Заменены на пустые `?=` для явной передачи.
+- **Тесты используют MockApiClient + NoopHttpClientAdapter** — хрупкая связка для обхода Dio-таймеров. При обновлении тестовой инфраструктуры пересмотреть.
 
 ### Документация
 
@@ -69,6 +72,7 @@
 ### Инфраструктура
 
 - ✅ **CORS: `Access-Control-Allow-Origin: *`** — теперь конфигурируется через `CORS_ORIGINS`.
+- ✅ **CORS: отсутствовал `PUT`** — добавлен в `Access-Control-Allow-Methods`.
 - **Нет pre-commit hooks** — `go fmt` и `dart format` не форматируются автоматически.
 - **DuckDNS токен в `.env`** — хорошо что в `.gitignore`, но стоит рассмотреть секрет-менеджер.
 - **retry без exponential backoff** — `fetcher.go` — всегда 1s между попытками, независимо от номера попытки.
@@ -80,12 +84,12 @@
 
 | Категория | 🔴 Critical | 🟡 High | 🟢 Low | ✅ Исправлено | Всего |
 |-----------|-------------|---------|--------|---------------|-------|
-| Безопасность | 3 | 0 | 0 | 3 | 3 |
+| Безопасность | 0 | 0 | 0 | 3 | 3 |
 | Архитектура | 0 | 3 | 0 | 0 | 3 |
-| Тесты | 3 | 0 | 0 | 0 | 3 |
+| Тесты | 0 | 0 | 1 | 3 | 3 |
 | Сервер | 0 | 3 | 1 | 0 | 4 |
-| Клиент | 0 | 3 | 1 | 0 | 4 |
-| UI/UX | 0 | 2 | 0 | 0 | 2 |
-| Инфраструктура | 0 | 0 | 5 | 1 | 5 |
-| Документация | 0 | 0 | 2 | 2 | 2 |
-| **Итого** | **6** | **11** | **9** | **6** | **26** |
+| Клиент | 0 | 2 | 1 | 1 | 4 |
+| UI/UX | 0 | 3 | 0 | 0 | 3 |
+| Инфраструктура | 0 | 0 | 5 | 2 | 5 |
+| Документация | 0 | 0 | 0 | 2 | 2 |
+| **Итого** | **0** | **11** | **8** | **11** | **27** |

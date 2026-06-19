@@ -19,37 +19,33 @@
 - [x] **Caddyfile** — домен читается из `{$DOMAIN}` (env)
 - [x] **docker-compose** — Caddy получает `DOMAIN`, DuckDNS парсит subdomain
 - [x] **build-android.yml** — `SERVER_URL` через `vars.SERVER_URL`
-- [x] **deploy.yml** — `DOMAIN` через `vars.DOMAIN`
+- [x] **deploy.yml** — `DOMAIN` через `vars.DOMAIN`, SUBDOMAIN вычисляется
 - [x] **Makefile** — `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `DOMAIN` больше не захордкожены
 
 ---
 
-## ⬜ Фаза 1 — Тесты (High Priority)
+## ✅ Фаза 1 — Тесты — ВЫПОЛНЕНО
 
-Самый критичный пробел проекта. Без тестов нет уверенности в рефакторинге и новых фичах.
+### Go unit-тесты (48 тестов, 5 файлов)
+- [x] **parser** (24 теста) — парсинг VLESS, VMess, Trojan, SS; подписки base64/JSON/plain; edge cases
+- [x] **resolver** (4 теста) — localhost, loopback, invalid domain, empty host
+- [x] **geo** (6 тестов) — nil DB, пустой список, все non-RU, invalid IP
+- [x] **config** (4 теста) — parseDotEnv (normal, quoted, whitespace, malformed), LoadConfig defaults/env
+- [x] **tester** (6 тестов) — ParseUUID (valid, zeros, Fs, invalid length, random), unhex
 
-### Go unit-тесты (минимум)
-- [ ] **parser** — `TEST(ParseConfigLink)` для vless, vmess, trojan, ss; `TEST(ParseSubscription)` для base64/JSON/plain
-- [ ] **resolver** — `TEST(ResolveIP)` с мок-резолвером
-- [ ] **geo** — `TEST(FilterNonRussia)` с мок-GeoDB
-- [ ] **config** — `TEST(ParseDotEnv)` с разными форматами строк
-- [ ] **tester** — `TEST(ParseUUID)` для корректности 16-байтного UUID
+### Dart тесты (13 тестов, 2 файла)
+- [x] **VpnConfig.fromJson / toJson / fromRawLink** (8 тестов)
+- [x] **WidgetTest** (5 тестов) — states: disconnected, connecting, error, debug menu, title
 
-### Go integration
-- [ ] **Добавить `golangci-lint` в CI** — перед deploy workflow
-- [ ] **Добавить `go test` в CI** — `go test ./internal/...`
-
-### Dart тесты
-- [ ] **VpnConfig** — `TEST(fromJson)`, `TEST(toJson)`, `TEST(fromRawLink)`
-- [ ] **ApiClient** — unit-тесты с мок-ответами (mockito/mocktail)
-- [ ] **WidgetTest** — `TEST(HomeScreen)` — проверка отображения состояний
-- [ ] **Добавить `flutter analyze` в CI**
+### CI
+- [x] **Добавить `go test` в CI** — добавлен в деплой workflow
+- [x] **Добавить `flutter analyze` и `flutter test` в CI** — добавлены
+- [ ] **Добавить `golangci-lint` в CI**
 
 ---
 
-## ⬜ Фаза 2 — Архитектура
+## ⬜ Фаза 2 — Архитектура (Go server)
 
-### Сервер (Go)
 - [ ] **Рефакторинг `cache.refresh()`** — выделить пайплайн:
   - `fetcher.Fetch()` → `parser.ParseAll()` → `tester.TestAll()` → `geo.Filter()` → `reality.Filter()` → `sort.ByLatency()`
   - Каждый шаг — отдельный публичный метод
@@ -58,7 +54,10 @@
 - [ ] **Добавить `net.Resolver` с DoH** — опциональный DNS-over-HTTPS для резолва
 - [ ] **Обновить/удалить устаревший `docker-compose.prod.yml`**
 
-### Клиент (Flutter/Dart)
+---
+
+## ⬜ Фаза 3 — Архитектура (Flutter client)
+
 - [ ] **Решить судьбу `domain/`**:
   - Вариант A: удалить пустую директорию
   - Вариант B: имплементировать `GetBestConfigUseCase`, `ConnectToVpnUseCase`
@@ -71,11 +70,11 @@
 
 ---
 
-## ⬜ Фаза 3 — Code Quality & Cleanup
+## ⬜ Фаза 4 — Code Quality & Cleanup
 
 ### Разделение home_screen.dart
-- [ ] Вынести `_ServerInfoCard` → `presentation/widgets/server_info_card.dart`
-- [ ] Вынести `_DebugSheet` → `presentation/widgets/debug_sheet.dart`
+- [x] **Вынести `_ServerInfoCard`** → `presentation/widgets/server_info_card.dart`
+- [x] **Вынести `_DebugSheet`** → `presentation/widgets/debug_sheet.dart`
 - [ ] Вынести строки UI в константы/локализацию
 
 ### Остальное
@@ -88,9 +87,56 @@
 
 ---
 
-## ⬜ Фаза 4 — Нереализованные фичи (из PLAN.md Roadmap)
+## ✅ Фаза 5 — Админ-панель в клиенте — ВЫПОЛНЕНО
 
-- [ ] **Выбор конкретного сервера из списка** — продвинутый режим, показать все конфиги и дать выбрать вручную
+### Сервер (добавить эндпоинты)
+- [x] **POST /api/admin/login** — авторизация админа (email + пароль из .env, отдаёт JWT или token)
+- [x] **GET /api/admin/health** — расширенный health (статус сервера, время работы, кол-во конфигов)
+- [x] **GET /api/admin/endpoints** — список всех доступных эндпоинтов сервера
+- [x] **POST /api/admin/refresh-configs** — принудительный refresh конфигов (сейчас есть, но без auth)
+- [x] **PUT /api/admin/config** — обновить `SUBSCRIPTION_URL` и `REFRESH_INTERVAL` (runtime)
+
+### Авторизация
+- [x] **Добавить `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env.example`** и в `config.go`
+- [x] **Middleware проверки токена** для /api/admin/* эндпоинтов
+
+### Клиент — экран входа
+- [x] **Создать `presentation/screens/admin_login_screen.dart`** — форма email + пароль
+- [x] **Добавить кнопку входа на главном экране** (иконка админа в AppBar)
+- [x] **Сохранять токен в SharedPreferences** после успешного входа
+
+### Клиент — админ-панель
+- [x] **Создать `presentation/screens/admin_panel_screen.dart`** — главный экран админа
+- [x] **Карточка Health** — статус сервера, uptime, кол-во конфигов (GET /api/admin/health)
+- [x] **Карточка Endpoints** — список всех эндпоинтов сервера (GET /api/admin/endpoints)
+- [x] **Карточка Subscription** — просмотр и редактирование SUBSCRIPTION_URL
+- [x] **Карточка Refresh Interval** — просмотр и редактирование REFRESH_INTERVAL
+- [x] **Кнопка "Refresh Configs Now"** — POST /api/admin/refresh-configs
+- [x] **Кнопка "Logout"** — сброс токена, возврат на главную
+
+### Разделение экранов
+- [x] **Вынести DebugSheet** из `home_screen.dart` → `presentation/widgets/debug_sheet.dart`
+- [x] **Вынести ServerInfoCard** из `home_screen.dart` → `presentation/widgets/server_info_card.dart`
+
+---
+
+## Фаза 6 — Выбор сервера из списка (выполнено)
+
+### UI
+- [x] **ServerInfoCard переработан** — Column layout: флаг страны + название, пинг (цветной бейдж), имя конфига, теги протокола
+- [x] **Prev/Next навигация** — кнопки `< >` для переключения между топ-10 конфигами
+- [x] **Счётчик позиции** — `3 / 10` между кнопками
+- [x] **Цветовая индикация пинга** — зелёный (<50ms), оранжевый (<100ms), красный (>=100ms)
+
+### Данные
+- [x] **Fetch `/api/configs`** — загрузка топ-10 при инициализации HomeScreen
+- [x] **Connect использует выбранный конфиг** — вместо `getBestConfig()` используется `_configs[_currentIndex]`
+- [x] **Карточка видна до подключения** — можно листать и выбирать, не нажимая CONNECT
+
+---
+
+## ⬜ Фаза 7 — Нереализованные фичи (из PLAN.md Roadmap)
+
 - [ ] **Поддержка REALITY в Flutter клиенте** — требует uTLS/Xray core (Go 1.24+)
 - [ ] **История подключений** — логи соединений, статистика
 - [ ] **Push-уведомления о статусе сервера** — через Firebase Cloud Messaging
@@ -103,34 +149,31 @@
 ## Приоритет выполнения
 
 ```
-1. ✅ Фаза 0 — Безопасность              (выполнено)
-2. ✅ Фаза 0.5 — Убрать хардкод домена    (выполнено)
-3. 🔴 Фаза 1 — Тесты                      (следующий шаг)
-4. 🟡 Фаза 2 — Архитектура                (после тестов)
-5. 🟡 Фаза 3 — Code Quality               (параллельно с Фазой 2)
-6. 🟢 Фаза 4 — Новые фичи                 (после стабилизации)
+1. ✅ Фаза 0 — Безопасность                (выполнено)
+2. ✅ Фаза 0.5 — Хардкод домена            (выполнено)
+3. ✅ Фаза 1 — Тесты                       (выполнено)
+4. ✅ Фаза 5 — Админ-панель               (выполнено)
+5. ✅ Фаза 6 — Выбор сервера из списка     (выполнено)
+6. 🟡 Фаза 2 — Архитектура Go             (следующий шаг)
+7. 🟡 Фаза 3 — Архитектура Flutter        (после Go)
+8. 🟡 Фаза 4 — Code Quality               (параллельно)
+9. 🟢 Фаза 7 — Новые фичи                 (после стабилизации)
 ```
 
-### Быстрые победы (1-2 часа) — сделано ✅
-- ~~SCRUB credentials из PLAN.md~~ ✅
-- ~~README `/health` status fix~~ ✅
-- ~~Убрать хардкод домена~~ ✅
-- ~~CORS конфигурация~~ ✅
+### Быстрые победы (1-2 часа)
 - `link.hashCode` → `server:port`
 - `parseDotEnv` Windows `\r\n`
 - Удалить пустую `domain/`
 - `docker-compose.prod.yml` cleanup
 
 ### Средний приоритет (2-8 часов)
-- Unit-тесты parser, resolver, geo
-- `golangci-lint` + `flutter analyze` в CI
-- Разделение home_screen.dart
-- REALITY filter вынести из cache.refresh()
+- Рефакторинг `cache.refresh()` в pipeline
+- Вынести REALITY filter
 - Exponential backoff в fetcher
+- `golangci-lint` в CI
 
 ### Большие работы (8+ часов)
-- Рефакторинг `cache.refresh()` в pipeline
 - Persistence из ApiClient → StorageService
 - `initialize()` рефакторинг VpnService
 - WireGuard protocol
-- Выбор сервера из списка (UI + API)
+- REALITY support в Flutter
