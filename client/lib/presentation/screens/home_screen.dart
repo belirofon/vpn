@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models/vpn_config.dart';
+import '../../core/update/update_service.dart';
 import '../../core/vpn/vpn_service.dart';
 import '../widgets/server_info_card.dart';
 import '../widgets/debug_sheet.dart';
@@ -11,11 +13,13 @@ import 'admin_login_screen.dart';
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VpnService vpnService;
+  final UpdateService updateService;
 
   const HomeScreen({
     super.key,
     required this.apiClient,
     required this.vpnService,
+    required this.updateService,
   });
 
   @override
@@ -48,6 +52,103 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     _fetchConfigs();
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final info = await widget.updateService.checkForUpdate();
+      if (info == null || !mounted) return;
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!widget.updateService.isNewer(packageInfo.version, info)) return;
+      if (!mounted) return;
+
+      _showUpdateDialog(info);
+    } catch (_) {}
+  }
+
+  void _showUpdateDialog(UpdateInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        String? downloadingPath;
+        double? downloadProgress;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Update v${info.version}'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Available changes:',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text(info.changelog, style: const TextStyle(fontSize: 13)),
+                    if (downloadProgress != null) ...[
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(value: downloadProgress),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(downloadProgress! * 100).toInt()}%',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                    if (downloadingPath != null) ...[
+                      const SizedBox(height: 12),
+                      const Text('Download complete. Installing...',
+                          style: TextStyle(color: Colors.green)),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (downloadingPath == null)
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Later'),
+                  ),
+                if (downloadProgress == null && downloadingPath == null)
+                  FilledButton(
+                    onPressed: () async {
+                      setDialogState(() => downloadProgress = 0);
+                      try {
+                        final path = await widget.updateService.downloadApk(
+                          url: info.downloadUrl,
+                          onProgress: (received, total) {
+                            if (total > 0) {
+                              setDialogState(() =>
+                                  downloadProgress = received / total);
+                            }
+                          },
+                        );
+                        setDialogState(() => downloadingPath = path);
+                        await widget.updateService.installApk(path);
+                      } catch (_) {
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                          _showErrorSnackBar('Download failed. Try again later.');
+                        }
+                      }
+                    },
+                    child: const Text('Update'),
+                  ),
+                if (downloadingPath != null)
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Close'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _fetchConfigs() async {

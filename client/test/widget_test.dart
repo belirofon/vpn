@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/data/api/api_client.dart';
 import 'package:vpn_client/data/models/vpn_config.dart';
+import 'package:vpn_client/core/update/update_service.dart';
 import 'package:vpn_client/core/vpn/vpn_service.dart';
 import 'package:vpn_client/presentation/screens/home_screen.dart';
 import 'package:dio/dio.dart';
@@ -37,6 +38,14 @@ class NoopHttpClientAdapter implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+// Mock UpdateService — always returns no updates
+class MockUpdateService extends UpdateService {
+  MockUpdateService() : super(MockApiClient());
+
+  @override
+  Future<UpdateInfo?> checkForUpdate() async => null;
 }
 
 // Mock VpnService for testing UI in isolation
@@ -95,6 +104,7 @@ void main() {
           home: HomeScreen(
             apiClient: apiClient,
             vpnService: vpnService,
+            updateService: MockUpdateService(),
           ),
         ),
       );
