@@ -43,6 +43,9 @@ jobs:
             set -e
             cd ~/vpn-server
 
+            # Ensure DOMAIN has a value (GitHub vars.DOMAIN may not be set)
+            DOMAIN="${DOMAIN:-belirofon-vpn.duckdns.org}"
+
             # Create .env from secret if missing
             if [ ! -f .env ]; then
               printf '%s\n' "$ENV_FILE" > .env
