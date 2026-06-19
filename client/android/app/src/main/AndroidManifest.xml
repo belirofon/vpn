@@ -14,13 +14,6 @@
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true">
         
-        <!-- VPN Service for flutter_v2ray_plus -->
-        <service
-            android:name="com.tester.flutter_v2ray_plus.FlutterV2rayService"
-            android:permission="android.permission.BIND_VPN_SERVICE"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-            
         <activity
             android:name=".MainActivity"
             android:exported="true"
