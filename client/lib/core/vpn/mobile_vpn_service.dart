@@ -55,38 +55,31 @@ class MobileVpnService implements VpnService {
 
       final parsed = FlutterV2ray.parseFromURL(config.rawLink!);
 
-      // Fix 1: Enable DNS sniffing so V2Ray intercepts DNS queries
-      // Without this, UDP DNS requests hit the TCP-only VLESS outbound and get dropped
+      // Enable DNS sniffing so V2Ray intercepts DNS queries
       parsed.inbound["sniffing"] = {
         "enabled": true,
         "destOverride": ["http", "tls"],
       };
 
-      // Fix 2: Set DNS servers (V2Ray uses these internally for sniffing)
+      // Set DNS servers
       parsed.dns = {
         "servers": [
-          "https://1.1.1.1/dns-query", // DNS-over-HTTPS bypasses carrier blocking
+          "https://1.1.1.1/dns-query",
           "1.1.1.1",
         ],
       };
 
-      // Fix 3: Explicit routing — UDP bypasses proxy (VLESS+WS is TCP-only),
-      // TCP goes through proxy
-      parsed.routing = {
-        "domainStrategy": "UseIp",
-        "rules": [
-          {
-            "type": "field",
-            "network": "udp",
-            "outboundTag": "direct",
-          },
-          {
-            "type": "field",
-            "network": "tcp",
-            "outboundTag": "proxy",
-          },
-        ],
-      };
+      // For TCP-only protocols (WS, etc.) — route UDP directly, TCP through proxy.
+      // For REALITY (XTLS Vision) — skip override, XTLS handles both TCP/UDP.
+      if (config.tls != 'reality') {
+        parsed.routing = {
+          "domainStrategy": "UseIp",
+          "rules": [
+            {"type": "field", "network": "udp", "outboundTag": "direct"},
+            {"type": "field", "network": "tcp", "outboundTag": "proxy"},
+          ],
+        };
+      }
 
       final configJson = parsed.getFullConfiguration();
 

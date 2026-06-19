@@ -134,10 +134,12 @@ func SetupAdminRoutes(r *gin.Engine, cfg *config.Config, cc *cache.ConfigCache) 
 			}
 
 			updates := []string{}
+			needsRefresh := false
 			if req.SubscriptionURL != nil {
 				cfg.SubscriptionURL = *req.SubscriptionURL
 				cc.SetSubscriptionURL(*req.SubscriptionURL)
 				updates = append(updates, "SUBSCRIPTION_URL")
+				needsRefresh = true
 			}
 			if req.RefreshInterval != nil {
 				d, err := time.ParseDuration(*req.RefreshInterval)
@@ -149,9 +151,16 @@ func SetupAdminRoutes(r *gin.Engine, cfg *config.Config, cc *cache.ConfigCache) 
 				cc.SetRefreshInterval(d)
 				updates = append(updates, "REFRESH_INTERVAL")
 			}
+
+			// Auto-trigger refresh when subscription URL changes
+			if needsRefresh {
+				go cc.Refresh()
+			}
+
 			c.JSON(http.StatusOK, gin.H{
 				"status":  "updated",
 				"updated": updates,
+				"refresh": needsRefresh,
 			})
 		})
 
