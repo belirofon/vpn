@@ -27,7 +27,7 @@ type pingResult struct {
 	OK        bool
 }
 
-func TestConfigs(configs []*model.VpnConfig, timeout time.Duration) []*model.VpnConfig {
+func TestConfigs(configs []*model.VpnConfig, timeout time.Duration, skipVerifyTLS bool) []*model.VpnConfig {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 500)
@@ -42,7 +42,7 @@ func TestConfigs(configs []*model.VpnConfig, timeout time.Duration) []*model.Vpn
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			pr := pingServer(c, timeout)
+			pr := pingServer(c, timeout, skipVerifyTLS)
 			if !pr.OK {
 				return
 			}
@@ -59,7 +59,7 @@ func TestConfigs(configs []*model.VpnConfig, timeout time.Duration) []*model.Vpn
 	return results
 }
 
-func pingServer(cfg *model.VpnConfig, timeout time.Duration) pingResult {
+func pingServer(cfg *model.VpnConfig, timeout time.Duration, skipVerifyTLS bool) pingResult {
 	ip, err := resolver.ResolveIP(cfg.Server, timeout)
 	if err != nil {
 		return pingResult{OK: false}
@@ -78,7 +78,7 @@ func pingServer(cfg *model.VpnConfig, timeout time.Duration) pingResult {
 	switch {
 	// VLESS: full proxy test through a domain-based target (tests DNS + protocol + forwarding)
 	case cfg.Protocol == "vless" && cfg.TLS != "reality":
-		if !testVlessProxy(conn, cfg, timeout) {
+		if !testVlessProxy(conn, cfg, timeout, skipVerifyTLS) {
 			return pingResult{OK: false}
 		}
 
@@ -87,7 +87,7 @@ func pingServer(cfg *model.VpnConfig, timeout time.Duration) pingResult {
 		if cfg.TLS == "tls" {
 			tlsConn := tls.Client(conn, &tls.Config{
 				ServerName:         cfg.Server,
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: skipVerifyTLS,
 			})
 			if err := tlsConn.Handshake(); err != nil {
 				return pingResult{OK: false}
@@ -103,7 +103,7 @@ func pingServer(cfg *model.VpnConfig, timeout time.Duration) pingResult {
 		if cfg.TLS == "tls" {
 			tlsConn := tls.Client(conn, &tls.Config{
 				ServerName:         cfg.Server,
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: skipVerifyTLS,
 			})
 			if err := tlsConn.Handshake(); err != nil {
 				return pingResult{OK: false}

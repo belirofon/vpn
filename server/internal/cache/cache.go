@@ -154,7 +154,7 @@ func (cc *ConfigCache) refresh() {
 
 	cc.setStatus(model.StatusTesting, "Testing configs...")
 
-	tested := tester.TestConfigs(parsed, cc.cfg.PingTimeout)
+	tested := tester.TestConfigs(parsed, cc.cfg.PingTimeout, cc.cfg.SkipVerifyTLS)
 	log.Printf("INFO: %d/%d configs passed connectivity test", len(tested), len(parsed))
 
 	if len(tested) == 0 {

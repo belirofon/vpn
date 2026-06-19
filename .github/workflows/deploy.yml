@@ -61,7 +61,7 @@ jobs:
 
       - name: Health check
         env:
-          DOMAIN: belirofon-vpn.duckdns.org
+          DOMAIN: ${{ vars.DOMAIN }}
         run: |
           echo "Waiting for server to initialize..."
           for i in $(seq 1 12); do

@@ -68,6 +68,8 @@ type Config struct {
 	PingTimeout      time.Duration
 	GeoIPDBPath      string
 	MockConfigs      bool
+	SkipVerifyTLS    bool   // SKIP_VERIFY_TLS — skip TLS cert verification (default: true for proxy testing compat)
+	CORSOrigins      string // CORS_ORIGINS — allowed CORS origins (default: *)
 }
 
 func LoadConfig() Config {
@@ -78,6 +80,8 @@ func LoadConfig() Config {
 		PingTimeout:      getDuration("PING_TIMEOUT", 5*time.Second),
 		GeoIPDBPath:      getEnv("GEOIP_DB_PATH", "./GeoLite2-Country.mmdb"),
 		MockConfigs:      os.Getenv("MOCK_CONFIGS") == "true",
+		SkipVerifyTLS:    os.Getenv("SKIP_VERIFY_TLS") != "false",
+		CORSOrigins:      getEnv("CORS_ORIGINS", "*"),
 	}
 	return cfg
 }

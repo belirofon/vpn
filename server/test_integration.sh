@@ -27,7 +27,7 @@ PID=$!; sleep 1
 echo ""
 echo "--- 1. Health ---"
 code  "$BASE/health"         200 "GET /health → 200"
-chk   "$BASE/health"         '"status":"ok"'                   "health response has status=ok"
+chk   "$BASE/health"         '"status":"ready"'                "health response has status=ready"
 
 echo "--- 2. Configs (RU filtered out) ---"
 chk   "$BASE/api/configs"    '"configs"'                       "configs response has configs array"

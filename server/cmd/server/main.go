@@ -41,7 +41,7 @@ func main() {
 
 	// Gin router
 	r := gin.Default()
-	r.Use(corsMiddleware())
+	r.Use(corsMiddleware(cfg.CORSOrigins))
 
 	handler.SetupRoutes(r, cache)
 
@@ -75,9 +75,14 @@ func main() {
 	log.Println("INFO: server stopped")
 }
 
-func corsMiddleware() gin.HandlerFunc {
+func corsMiddleware(origins string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		if origins == "*" || origins == origin {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origins)
+		} else if origins != "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origins)
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == "OPTIONS" {

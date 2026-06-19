@@ -1,11 +1,11 @@
 services:
-  # DuckDNS: auto-updates IP for belirofon-vpn.duckdns.org
+  # DuckDNS: auto-updates IP for your domain (uses DOMAIN prefix: domain.duckdns.org)
   duckdns:
     image: lscr.io/linuxserver/duckdns:latest
     container_name: duckdns
     restart: unless-stopped
     environment:
-      - SUBDOMAINS=belirofon-vpn
+      - SUBDOMAINS=${DOMAIN%.duckdns.org}
       - TOKEN=${DUCK_DNS_TOKEN}
       - LOG_FILE=false
 
@@ -20,6 +20,8 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+    environment:
+      - DOMAIN=${DOMAIN}
     depends_on:
       - vpn-server
 

@@ -9,11 +9,11 @@ class ApiClient {
   SharedPreferences? _prefs;
 
   static String? _webUrl;
-  // Debug: localhost (for local dev with mock server)
-  // Release: production server (overridable via --dart-define=SERVER_URL or debug menu)
-  static const String _defaultWebUrl = kReleaseMode
-      ? 'https://belirofon-vpn.duckdns.org:8443'
-      : 'http://localhost:8080';
+  // Default URL is always localhost (for local dev with mock server).
+  // In production, SERVER_URL MUST be set via --dart-define at build time:
+  //   flutter build apk --dart-define=SERVER_URL=https://your-domain.com:8443
+  // Or changed at runtime via long-press debug menu (persisted to SharedPreferences).
+  static const String _defaultWebUrl = 'http://localhost:8080';
   static const String _baseUrlKey = 'server_url';
 
   ApiClient(this._dio);

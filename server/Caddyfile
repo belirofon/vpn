@@ -1,4 +1,4 @@
-belirofon-vpn.duckdns.org {
+{$DOMAIN} {
     tls {
         issuer acme {
             alt_tlsalpn_port -1

@@ -129,12 +129,13 @@ logs:
 # =============================================================================
 # Remote server deployment (Docker)
 # =============================================================================
-# Remote server connection (from PLAN.md)
-SSH_HOST    ?= 162.248.227.46
-SSH_PORT    ?= 1337
-SSH_USER    ?= pilot
+# Remote server connection — set these via env or .env.local (not committed)
+#   export SSH_HOST=your-server.com SSH_PORT=22 SSH_USER=deploy DOMAIN=your.domain.com
+SSH_HOST    ?=
+SSH_PORT    ?= 22
+SSH_USER    ?= deploy
 SSH_KEY     ?= $(HOME)/.ssh/id_ed25519
-DOMAIN      ?= belirofon-vpn.duckdns.org
+DOMAIN      ?=
 # Build Docker image locally
 docker-build:
 	docker build -t vpn-server server/
