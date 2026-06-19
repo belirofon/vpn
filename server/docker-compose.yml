@@ -5,7 +5,7 @@ services:
     container_name: duckdns
     restart: unless-stopped
     environment:
-      - SUBDOMAINS=${DOMAIN%.duckdns.org}
+      - SUBDOMAINS=${SUBDOMAIN}
       - TOKEN=${DUCK_DNS_TOKEN}
       - LOG_FILE=false
 

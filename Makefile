@@ -160,6 +160,8 @@ deploy:
 		   echo '=== .env CREATED from .env.example — EDIT IT: ssh -p $(SSH_PORT) $(SSH_USER)@$(SSH_HOST) \"nano ~/vpn-server/.env\"' && \
 		   exit 1; \
 		 fi && \
+		 DOMAIN_VAL=$$(grep '^DOMAIN=' .env | head -1 | cut -d= -f2) && \
+		 export SUBDOMAIN=$${DOMAIN_VAL%.duckdns.org} && \
 		 ([ -f GeoLite2-Country.mmdb ] || curl -sL -o GeoLite2-Country.mmdb \
 		   https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb) && \
 		 docker compose build --pull && docker compose up -d"

@@ -32,12 +32,13 @@ jobs:
         env:
           ENV_FILE: ${{ secrets.ENV_FILE }}
           DUCK_DNS_TOKEN: ${{ secrets.DUCK_DNS_TOKEN }}
+          DOMAIN: ${{ vars.DOMAIN }}
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: ENV_FILE,DUCK_DNS_TOKEN
+          envs: ENV_FILE,DUCK_DNS_TOKEN,DOMAIN
           script: |
             set -e
             cd ~/vpn-server
@@ -46,8 +47,13 @@ jobs:
             if [ ! -f .env ]; then
               printf '%s\n' "$ENV_FILE" > .env
               echo "DUCK_DNS_TOKEN=$DUCK_DNS_TOKEN" >> .env
+              echo "DOMAIN=$DOMAIN" >> .env
               echo "=== .env created ==="
             fi
+
+            # Extract subdomain for DuckDNS (strip .duckdns.org suffix)
+            SUBDOMAIN="${DOMAIN%.duckdns.org}"
+            export SUBDOMAIN
 
             # Download GeoIP database if missing
             if [ ! -f GeoLite2-Country.mmdb ]; then
