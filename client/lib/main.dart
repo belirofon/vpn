@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/api/api_client.dart';
+import 'core/update/update_service.dart';
 import 'core/vpn/vpn_service.dart';
 import 'core/vpn/mobile_vpn_service.dart';
 import 'core/vpn/web_vpn_service.dart';
@@ -25,8 +26,13 @@ void main() async {
   }
 
   final vpnService = _createVpnService();
+  final updateService = UpdateService(apiClient);
 
-  runApp(VpnApp(apiClient: apiClient, vpnService: vpnService));
+  runApp(VpnApp(
+    apiClient: apiClient,
+    vpnService: vpnService,
+    updateService: updateService,
+  ));
 }
 
 VpnService _createVpnService() {
@@ -39,11 +45,13 @@ VpnService _createVpnService() {
 class VpnApp extends StatelessWidget {
   final ApiClient apiClient;
   final VpnService vpnService;
+  final UpdateService updateService;
 
   const VpnApp({
     super.key,
     required this.apiClient,
     required this.vpnService,
+    required this.updateService,
   });
 
   @override
@@ -55,7 +63,11 @@ class VpnApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: HomeScreen(apiClient: apiClient, vpnService: vpnService),
+      home: HomeScreen(
+        apiClient: apiClient,
+        vpnService: vpnService,
+        updateService: updateService,
+      ),
     );
   }
 }

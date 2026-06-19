@@ -104,6 +104,41 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/vpn-client-android.apk 2>/dev/null || \
           cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/vpn-client-android.apk
 
+      - name: Upload APK to server
+        if: steps.keystore.outputs.keystore == 'exists' && vars.SERVER_URL != ''
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "client/build/app/outputs/flutter-apk/vpn-client-android.apk"
+          target: "~/vpn-server/apk/"
+          strip_components: 5
+
+      - name: Update version.json on server
+        if: steps.keystore.outputs.keystore == 'exists' && vars.SERVER_URL != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/vpn-server
+            CHANGELOG="- REALITY support\n- Admin panel\n- Server selection\n- In-app updates"
+            cat > apk/version.json <<VERSION_EOF
+            {
+              "version": "${{ steps.version.outputs.version }}",
+              "build_number": ${{ steps.version.outputs.build_number }},
+              "download_url": "https://${{ vars.DOMAIN }}:8443/api/update/download",
+              "changelog": "${CHANGELOG}"
+            }
+            VERSION_EOF
+            ls -la apk/
+            echo "=== version.json updated ==="
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

@@ -36,9 +36,11 @@ services:
       - .env
     volumes:
       - ./GeoLite2-Country.mmdb:/app/GeoLite2-Country.mmdb:ro
+      - ./apk:/app/apk:ro
     environment:
       - SKIP_DOTENV=true
       - GEOIP_DB_PATH=/app/GeoLite2-Country.mmdb
+      - APK_DIR=/app/apk
     logging:
       driver: "json-file"
       options:

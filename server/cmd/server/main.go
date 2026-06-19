@@ -44,6 +44,7 @@ func main() {
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 
 	handler.SetupRoutes(r, cache, &cfg)
+	handler.SetupUpdateRoutes(r)
 
 	// HTTP server
 	srv := &http.Server{

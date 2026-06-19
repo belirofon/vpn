@@ -1,0 +1,6 @@
+{
+  "version": "1.0.3",
+  "build_number": 24,
+  "download_url": "https://belirofon-vpn.duckdns.org:8443/api/update/download",
+  "changelog": "- REALITY support\n- Admin panel\n- Server selection\n- In-app updates"
+}

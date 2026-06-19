@@ -238,6 +238,22 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>?> checkForUpdate() async {
+    final url = serverUrl;
+    if (url == null) return null;
+
+    try {
+      final response = await _dio.get('$url/api/update');
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.checkForUpdate error: $e');
+      return null;
+    }
+  }
+
   Future<bool> healthCheck() async {
     final url = serverUrl;
     if (url == null) return false;
