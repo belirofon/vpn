@@ -52,6 +52,16 @@ jobs:
             echo "keystore=none" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify keystore password
+        if: steps.keystore.outputs.keystore == 'exists'
+        run: |
+          keytool -list -keystore android/app/keystore.jks \
+            -storepass '${{ secrets.ANDROID_STORE_PASSWORD }}' \
+            -alias '${{ secrets.ANDROID_KEY_ALIAS }}' 2>&1 || {
+            echo "❌ Keystore password/alias mismatch. Check ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS secrets."
+            exit 1
+          }
+
       - name: Create key.properties
         if: steps.keystore.outputs.keystore == 'exists'
         run: |
