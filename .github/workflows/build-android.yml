@@ -62,11 +62,12 @@ jobs:
           storeFile=keystore.jks
           EOF
 
-      - name: Extract version from tag
+      - name: Extract version
         id: version
         run: |
+          # If triggered by tag (v1.2.3) → "1.2.3", otherwise "0.0.0"
           TAG="${GITHUB_REF_NAME#v}"
-          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG:-0.0.0}" >> "$GITHUB_OUTPUT"
           echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Build APK (signed release)
@@ -83,6 +84,9 @@ jobs:
         if: steps.keystore.outputs.keystore != 'exists'
         run: >
           flutter build apk --debug
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ steps.version.outputs.build_number }}
+          --dart-define=SERVER_URL=${{ vars.SERVER_URL }}
           --dart-define=APP_VERSION=${{ steps.version.outputs.version }}
 
       - name: Rename APK for release upload

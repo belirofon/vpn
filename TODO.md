@@ -47,10 +47,10 @@
 ## ⬜ Фаза 2 — Архитектура (Go server)
 
 - [ ] **Рефакторинг `cache.refresh()`** — выделить пайплайн:
-  - `fetcher.Fetch()` → `parser.ParseAll()` → `tester.TestAll()` → `geo.Filter()` → `reality.Filter()` → `sort.ByLatency()`
+  - `fetcher.Fetch()` → `parser.ParseAll()` → `tester.TestAll()` → `geo.Filter()` → `sort.ByLatency()`
   - Каждый шаг — отдельный публичный метод
 - [ ] **Вынести сортировку** — общий `sort.SortByLatency()` для `refresh()` и `loadMockConfigs()`
-- [ ] **Вынести REALITY filter** — отдельный пакет `internal/filter/reality.go`
+- [x] **REALITY filter** — удалён из `cache.go` (фильтрация больше не нужна; REALITY конфиги тестируются и отдаются в API)
 - [ ] **Добавить `net.Resolver` с DoH** — опциональный DNS-over-HTTPS для резолва
 - [ ] **Обновить/удалить устаревший `docker-compose.prod.yml`**
 
@@ -120,7 +120,7 @@
 
 ---
 
-## Фаза 6 — Выбор сервера из списка (выполнено)
+## ✅ Фаза 6 — Выбор сервера из списка — ВЫПОЛНЕНО
 
 ### UI
 - [x] **ServerInfoCard переработан** — Column layout: флаг страны + название, пинг (цветной бейдж), имя конфига, теги протокола
@@ -137,7 +137,10 @@
 
 ## ⬜ Фаза 7 — Нереализованные фичи (из PLAN.md Roadmap)
 
-- [ ] **Поддержка REALITY в Flutter клиенте** — требует uTLS/Xray core (Go 1.24+)
+- [x] **Сервер: REALITY фильтр удалён** — REALITY конфиги тестируются (TCP+latency) и доступны в API
+- [x] **Dart модель VpnConfig** — добавлены REALITY поля (sni, fp, pbk, sid, flow)
+- [ ] **REALITY в flutter_v2ray_plus** — raw-link уже содержит параметры, нужно проверить подключение (Xray-core должен поддерживать)
+- [ ] **uTLS для полного протокольного теста REALITY** — требует Go 1.24+, заблокировано
 - [ ] **История подключений** — логи соединений, статистика
 - [ ] **Push-уведомления о статусе сервера** — через Firebase Cloud Messaging
 - [ ] **Тёмная тема** — `ThemeMode.dark` по расписанию или системной настройке
@@ -154,10 +157,12 @@
 3. ✅ Фаза 1 — Тесты                       (выполнено)
 4. ✅ Фаза 5 — Админ-панель               (выполнено)
 5. ✅ Фаза 6 — Выбор сервера из списка     (выполнено)
-6. 🟡 Фаза 2 — Архитектура Go             (следующий шаг)
-7. 🟡 Фаза 3 — Архитектура Flutter        (после Go)
-8. 🟡 Фаза 4 — Code Quality               (параллельно)
-9. 🟢 Фаза 7 — Новые фичи                 (после стабилизации)
+6. ⬜ Фаза R1 — REALITY сервер            (выполнено: filter удалён, модель обновлена, сервер задеплоен)
+7. 🟡 Фаза R2 — REALITY Flutter           (проверить подключение через flutter_v2ray_plus)
+8. 🟡 Фаза 2 — Архитектура Go             (следующий шаг)
+9. 🟡 Фаза 3 — Архитектура Flutter        (после Go)
+10. 🟡 Фаза 4 — Code Quality              (параллельно)
+11. 🟢 Фаза 7 — Новые фичи                (после стабилизации)
 ```
 
 ### Быстрые победы (1-2 часа)
@@ -168,7 +173,6 @@
 
 ### Средний приоритет (2-8 часов)
 - Рефакторинг `cache.refresh()` в pipeline
-- Вынести REALITY filter
 - Exponential backoff в fetcher
 - `golangci-lint` в CI
 
@@ -176,4 +180,4 @@
 - Persistence из ApiClient → StorageService
 - `initialize()` рефакторинг VpnService
 - WireGuard protocol
-- REALITY support в Flutter
+- Проверка REALITY подключения в flutter_v2ray_plus

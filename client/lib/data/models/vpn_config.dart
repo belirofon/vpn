@@ -11,6 +11,13 @@ class VpnConfig {
   final int latencyMs;
   final String country;
   final String? rawLink;
+  final String? host;
+  final String? path;
+  final String? sni;
+  final String? fp;
+  final String? pbk;
+  final String? sid;
+  final String? flow;
 
   VpnConfig({
     required this.id,
@@ -25,6 +32,13 @@ class VpnConfig {
     this.latencyMs = 0,
     this.country = '',
     this.rawLink,
+    this.host,
+    this.path,
+    this.sni,
+    this.fp,
+    this.pbk,
+    this.sid,
+    this.flow,
   });
 
   /// Parse a raw proxy link (vless://, vmess://, etc.) into a VpnConfig.
@@ -64,6 +78,13 @@ class VpnConfig {
       latencyMs: json['latency_ms'] as int? ?? 0,
       country: json['country'] as String? ?? '',
       rawLink: json['raw_link'] as String?,
+      host: json['host'] as String?,
+      path: json['path'] as String?,
+      sni: json['sni'] as String?,
+      fp: json['fp'] as String?,
+      pbk: json['pbk'] as String?,
+      sid: json['sid'] as String?,
+      flow: json['flow'] as String?,
     );
   }
 
@@ -81,6 +102,13 @@ class VpnConfig {
       'latency_ms': latencyMs,
       'country': country,
       if (rawLink != null) 'raw_link': rawLink,
+      if (host != null) 'host': host,
+      if (path != null) 'path': path,
+      if (sni != null) 'sni': sni,
+      if (fp != null) 'fp': fp,
+      if (pbk != null) 'pbk': pbk,
+      if (sid != null) 'sid': sid,
+      if (flow != null) 'flow': flow,
     };
   }
 
