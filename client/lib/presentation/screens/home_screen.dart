@@ -101,8 +101,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                     if (downloadingPath != null) ...[
                       const SizedBox(height: 12),
-                      const Text('Download complete. Installing...',
+                      const Text('Download complete.',
                           style: TextStyle(color: Colors.green)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'If the installer did not open, enable\n"Install unknown apps" in app settings.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
                     ],
                   ],
                 ),
