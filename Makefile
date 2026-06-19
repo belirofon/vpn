@@ -70,14 +70,16 @@ IPA_PATH = client/build/ios/ipa/vpn_client.ipa
 #   make build-android                       # default: use debug menu
 #   make build-android SERVER_URL=http://192.168.1.42:8080   # Wi-Fi адрес сервера
 build-android:
-	cd client && flutter build apk --debug $(if $(SERVER_URL),--dart-define=SERVER_URL=$(SERVER_URL),)
+	cd client && flutter build apk --debug \
+		$(if $(SERVER_URL),--dart-define=SERVER_URL=$(SERVER_URL),)
 	@echo "=== APK: $(APK_PATH) ==="
 
 # Build Android APK (release, requires signing config)
 # For CI: set ANDROID_KEYSTORE_PATH, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 # For local: put keystore.jks in client/android/app/ and create key.properties
 build-android-release:
-	cd client && flutter build apk --release $(if $(SERVER_URL),--dart-define=SERVER_URL=$(SERVER_URL),)
+	cd client && flutter build apk --release \
+		$(if $(SERVER_URL),--dart-define=SERVER_URL=$(SERVER_URL),)
 	@echo "=== Release APK: $(APK_RELEASE_PATH) ==="
 
 # Build iOS IPA (release, requires macOS + Apple Developer account)

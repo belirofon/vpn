@@ -45,24 +45,45 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             mkdir -p android/app
-            echo "$KEYSTORE_B64" | base64 -d > android/app/keystore.jks 2>/dev/null && echo "keystore=exists" >> "$GITHUB_OUTPUT" || echo "keystore=none" >> "$GITHUB_OUTPUT"
+            echo "$KEYSTORE_B64" | base64 -d > android/app/keystore.jks 2>/dev/null && \
+              echo "keystore=exists" >> "$GITHUB_OUTPUT" || \
+              echo "keystore=none" >> "$GITHUB_OUTPUT"
           else
             echo "keystore=none" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Create key.properties
+        if: steps.keystore.outputs.keystore == 'exists'
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - name: Build APK (signed release)
         if: steps.keystore.outputs.keystore == 'exists'
-        env:
-          ANDROID_KEYSTORE_PATH: android/app/keystore.jks
-          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release --dart-define=SERVER_URL=${{ vars.SERVER_URL }}
+        run: >
+          flutter build apk --release
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ steps.version.outputs.build_number }}
+          --dart-define=SERVER_URL=${{ vars.SERVER_URL }}
+          --dart-define=APP_VERSION=${{ steps.version.outputs.version }}
         # Set SERVER_URL in GitHub repo → Settings → Secrets and variables → Actions → Variables
 
       - name: Build APK (debug — unsigned)
         if: steps.keystore.outputs.keystore != 'exists'
-        run: flutter build apk --debug
+        run: >
+          flutter build apk --debug
+          --dart-define=APP_VERSION=${{ steps.version.outputs.version }}
 
       - name: Rename APK for release upload
         run: |

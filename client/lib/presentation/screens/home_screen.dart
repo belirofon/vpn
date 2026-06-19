@@ -5,6 +5,7 @@ import '../../data/models/vpn_config.dart';
 import '../../core/vpn/vpn_service.dart';
 import '../widgets/server_info_card.dart';
 import '../widgets/debug_sheet.dart';
+import '../widgets/version_info.dart';
 import 'admin_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -320,6 +321,8 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                const VersionInfo(),
                 const Spacer(flex: 1),
               ],
             ),
