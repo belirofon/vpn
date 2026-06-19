@@ -21,7 +21,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     environment:
-      - DOMAIN=${DOMAIN}
+      - DOMAIN=${DOMAIN:-belirofon-vpn.duckdns.org}
     depends_on:
       - vpn-server
 
