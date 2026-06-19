@@ -24,11 +24,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   VpnConnectionState _connectionState = VpnConnectionState.disconnected;
-  VpnConfig? _activeConfig;
   StreamSubscription<VpnConnectionState>? _stateSub;
   String? _errorMessage;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  List<VpnConfig> _configs = [];
+  int _currentIndex = 0;
+  bool _isLoadingConfigs = true;
 
   @override
   void initState() {
@@ -42,6 +45,31 @@ class _HomeScreenState extends State<HomeScreen>
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _fetchConfigs();
+  }
+
+  Future<void> _fetchConfigs() async {
+    setState(() => _isLoadingConfigs = true);
+    final configs = await widget.apiClient.getConfigs();
+    if (!mounted) return;
+    setState(() {
+      _configs = configs.take(10).toList();
+      _currentIndex = 0;
+      _isLoadingConfigs = false;
+    });
+  }
+
+  void _goToPrev() {
+    if (_currentIndex > 0) {
+      setState(() => _currentIndex--);
+    }
+  }
+
+  void _goToNext() {
+    if (_currentIndex < _configs.length - 1) {
+      setState(() => _currentIndex++);
+    }
   }
 
   @override
@@ -56,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _connectionState = state;
       if (state == VpnConnectionState.disconnected) {
-        _activeConfig = null;
         _errorMessage = null;
       }
     });
@@ -77,19 +104,16 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() => _errorMessage = null);
 
+    if (_configs.isEmpty) {
+      setState(() {
+        _errorMessage = 'No configs available.\nCheck that the server is running.';
+      });
+      return;
+    }
+
     try {
-      final config = await widget.apiClient.getBestConfig();
-      if (!mounted) return;
-
-      if (config == null) {
-        setState(() {
-          _errorMessage = 'Server unavailable.\nCheck that the server is running.';
-        });
-        return;
-      }
-
+      final config = _configs[_currentIndex];
       await widget.vpnService.connect(config);
-      if (mounted) setState(() => _activeConfig = config);
     } catch (e) {
       if (mounted) {
         _showErrorSnackBar(e.toString());
@@ -204,8 +228,22 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 8),
                 // Server info
-                if (_activeConfig != null)
-                  ServerInfoCard(config: _activeConfig!),
+                if (_isLoadingConfigs)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  )
+                else if (_configs.isNotEmpty)
+                  ServerInfoCard(
+                    config: _configs[_currentIndex],
+                    currentIndex: _currentIndex,
+                    totalCount: _configs.length,
+                    onPrev: _goToPrev,
+                    onNext: _goToNext,
+                  ),
                 // Error message
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),

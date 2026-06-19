@@ -83,7 +83,7 @@ func corsMiddleware(origins string) gin.HandlerFunc {
 		} else if origins != "" {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origins)
 		}
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

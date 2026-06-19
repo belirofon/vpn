@@ -35,11 +35,11 @@
 
 ### Dart тесты (13 тестов, 2 файла)
 - [x] **VpnConfig.fromJson / toJson / fromRawLink** (8 тестов)
-- [x] **WidgetTest** (5 тестов) — states: disconnected, connecting error, debug menu, title
+- [x] **WidgetTest** (5 тестов) — states: disconnected, connecting, error, debug menu, title
 
 ### CI
-- [ ] **Добавить `go test` в CI** — перед deploy workflow
-- [ ] **Добавить `flutter analyze` и `flutter test` в CI**
+- [x] **Добавить `go test` в CI** — добавлен в деплой workflow
+- [x] **Добавить `flutter analyze` и `flutter test` в CI** — добавлены
 - [ ] **Добавить `golangci-lint` в CI**
 
 ---
@@ -73,8 +73,8 @@
 ## ⬜ Фаза 4 — Code Quality & Cleanup
 
 ### Разделение home_screen.dart
-- [ ] Вынести `_ServerInfoCard` → `presentation/widgets/server_info_card.dart`
-- [ ] Вынести `_DebugSheet` → `presentation/widgets/debug_sheet.dart`
+- [x] **Вынести `_ServerInfoCard`** → `presentation/widgets/server_info_card.dart`
+- [x] **Вынести `_DebugSheet`** → `presentation/widgets/debug_sheet.dart`
 - [ ] Вынести строки UI в константы/локализацию
 
 ### Остальное
@@ -87,42 +87,56 @@
 
 ---
 
-## ⬜ Фаза 5 — Админ-панель в клиенте
+## ✅ Фаза 5 — Админ-панель в клиенте — ВЫПОЛНЕНО
 
 ### Сервер (добавить эндпоинты)
-- [ ] **POST /api/admin/login** — авторизация админа (email + пароль из .env, отдаёт JWT или token)
-- [ ] **GET /api/admin/health** — расширенный health (статус сервера, время работы, кол-во конфигов)
-- [ ] **GET /api/admin/endpoints** — список всех доступных эндпоинтов сервера
-- [ ] **POST /api/admin/refresh-configs** — принудительный refresh конфигов (сейчас есть, но без auth)
-- [ ] **PUT /api/admin/config** — обновить `SUBSCRIPTION_URL` и `REFRESH_INTERVAL` (сохранить в .env или в runtime)
+- [x] **POST /api/admin/login** — авторизация админа (email + пароль из .env, отдаёт JWT или token)
+- [x] **GET /api/admin/health** — расширенный health (статус сервера, время работы, кол-во конфигов)
+- [x] **GET /api/admin/endpoints** — список всех доступных эндпоинтов сервера
+- [x] **POST /api/admin/refresh-configs** — принудительный refresh конфигов (сейчас есть, но без auth)
+- [x] **PUT /api/admin/config** — обновить `SUBSCRIPTION_URL` и `REFRESH_INTERVAL` (runtime)
 
 ### Авторизация
-- [ ] **Добавить `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env.example`** и в `config.go`
-- [ ] **Middleware проверки токена** для /api/admin/* эндпоинтов
+- [x] **Добавить `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env.example`** и в `config.go`
+- [x] **Middleware проверки токена** для /api/admin/* эндпоинтов
 
 ### Клиент — экран входа
-- [ ] **Создать `presentation/screens/admin_login_screen.dart`** — форма email + пароль
-- [ ] **Добавить кнопку входа на главном экране** (иконка/шестерёнка или Long-press, как DebugSheet)
-- [ ] **Сохранять токен в SharedPreferences** после успешного входа
+- [x] **Создать `presentation/screens/admin_login_screen.dart`** — форма email + пароль
+- [x] **Добавить кнопку входа на главном экране** (иконка админа в AppBar)
+- [x] **Сохранять токен в SharedPreferences** после успешного входа
 
 ### Клиент — админ-панель
-- [ ] **Создать `presentation/screens/admin_panel_screen.dart`** — главный экран админа
-- [ ] **Карточка Health** — статус сервера, uptime, кол-во конфигов (GET /api/admin/health)
-- [ ] **Карточка Endpoints** — список всех эндпоинтов сервера (GET /api/admin/endpoints)
-- [ ] **Карточка Subscription** — просмотр и редактирование SUBSCRIPTION_URL
-- [ ] **Карточка Refresh Interval** — просмотр и редактирование REFRESH_INTERVAL
-- [ ] **Кнопка "Refresh Configs Now"** — POST /api/admin/refresh-configs
-- [ ] **Кнопка "Logout"** — сброс токена, возврат на главную
+- [x] **Создать `presentation/screens/admin_panel_screen.dart`** — главный экран админа
+- [x] **Карточка Health** — статус сервера, uptime, кол-во конфигов (GET /api/admin/health)
+- [x] **Карточка Endpoints** — список всех эндпоинтов сервера (GET /api/admin/endpoints)
+- [x] **Карточка Subscription** — просмотр и редактирование SUBSCRIPTION_URL
+- [x] **Карточка Refresh Interval** — просмотр и редактирование REFRESH_INTERVAL
+- [x] **Кнопка "Refresh Configs Now"** — POST /api/admin/refresh-configs
+- [x] **Кнопка "Logout"** — сброс токена, возврат на главную
 
 ### Разделение экранов
-- [ ] **Вынести DebugSheet** из `home_screen.dart` → `presentation/widgets/debug_sheet.dart`
-- [ ] **Вынести ServerInfoCard** из `home_screen.dart` → `presentation/widgets/server_info_card.dart`
+- [x] **Вынести DebugSheet** из `home_screen.dart` → `presentation/widgets/debug_sheet.dart`
+- [x] **Вынести ServerInfoCard** из `home_screen.dart` → `presentation/widgets/server_info_card.dart`
 
 ---
 
-## ⬜ Фаза 6 — Нереализованные фичи (из PLAN.md Roadmap)
+## Фаза 6 — Выбор сервера из списка (выполнено)
 
-- [ ] **Выбор конкретного сервера из списка** — продвинутый режим, показать все конфиги и дать выбрать вручную
+### UI
+- [x] **ServerInfoCard переработан** — Column layout: флаг страны + название, пинг (цветной бейдж), имя конфига, теги протокола
+- [x] **Prev/Next навигация** — кнопки `< >` для переключения между топ-10 конфигами
+- [x] **Счётчик позиции** — `3 / 10` между кнопками
+- [x] **Цветовая индикация пинга** — зелёный (<50ms), оранжевый (<100ms), красный (>=100ms)
+
+### Данные
+- [x] **Fetch `/api/configs`** — загрузка топ-10 при инициализации HomeScreen
+- [x] **Connect использует выбранный конфиг** — вместо `getBestConfig()` используется `_configs[_currentIndex]`
+- [x] **Карточка видна до подключения** — можно листать и выбирать, не нажимая CONNECT
+
+---
+
+## ⬜ Фаза 7 — Нереализованные фичи (из PLAN.md Roadmap)
+
 - [ ] **Поддержка REALITY в Flutter клиенте** — требует uTLS/Xray core (Go 1.24+)
 - [ ] **История подключений** — логи соединений, статистика
 - [ ] **Push-уведомления о статусе сервера** — через Firebase Cloud Messaging
@@ -135,14 +149,15 @@
 ## Приоритет выполнения
 
 ```
-1. ✅ Фаза 0 — Безопасность               (выполнено)
+1. ✅ Фаза 0 — Безопасность                (выполнено)
 2. ✅ Фаза 0.5 — Хардкод домена            (выполнено)
 3. ✅ Фаза 1 — Тесты                       (выполнено)
-4. 🔴 Фаза 5 — Админ-панель               (следующий шаг)
-5. 🟡 Фаза 2 — Архитектура Go             (после админки)
-6. 🟡 Фаза 3 — Архитектура Flutter        (после админки)
-7. 🟡 Фаза 4 — Code Quality               (параллельно)
-8. 🟢 Фаза 6 — Новые фичи                 (после стабилизации)
+4. ✅ Фаза 5 — Админ-панель               (выполнено)
+5. ✅ Фаза 6 — Выбор сервера из списка     (выполнено)
+6. 🟡 Фаза 2 — Архитектура Go             (следующий шаг)
+7. 🟡 Фаза 3 — Архитектура Flutter        (после Go)
+8. 🟡 Фаза 4 — Code Quality               (параллельно)
+9. 🟢 Фаза 7 — Новые фичи                 (после стабилизации)
 ```
 
 ### Быстрые победы (1-2 часа)
@@ -150,18 +165,15 @@
 - `parseDotEnv` Windows `\r\n`
 - Удалить пустую `domain/`
 - `docker-compose.prod.yml` cleanup
-- DebugSheet вынести из `home_screen.dart`
 
 ### Средний приоритет (2-8 часов)
-- Админ-панель: серверные эндпоинты (login, health, endpoints, config)
-- Админ-панель: UI клиента (логин, панель, карточки)
-- `golangci-lint` + `flutter analyze` в CI
-- REALITY filter вынести из cache.refresh()
+- Рефакторинг `cache.refresh()` в pipeline
+- Вынести REALITY filter
 - Exponential backoff в fetcher
+- `golangci-lint` в CI
 
 ### Большие работы (8+ часов)
-- Рефакторинг `cache.refresh()` в pipeline
 - Persistence из ApiClient → StorageService
 - `initialize()` рефакторинг VpnService
 - WireGuard protocol
-- Выбор сервера из списка (UI + API)
+- REALITY support в Flutter
