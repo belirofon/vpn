@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"log"
 	"sort"
 	"sync"
@@ -15,23 +16,21 @@ import (
 )
 
 type ConfigCache struct {
-	mu         sync.RWMutex
-	status     model.ServerStatus
-	statusMsg  string
-	configs    []model.VpnConfig
-	updated    time.Time
-	startedAt  time.Time
-	cfg        config.Config
-	geo        *geo.GeoDB
-	ticker     *time.Ticker
-	stopCh     chan struct{}
+	mu           sync.RWMutex
+	status       model.ServerStatus
+	statusMsg    string
+	configs      []model.VpnConfig
+	updated      time.Time
+	startedAt    time.Time
+	cfg          config.Config
+	geo          *geo.GeoDB
+	tickerCancel context.CancelFunc
 }
 
 func NewCache(cfg config.Config, g *geo.GeoDB) *ConfigCache {
 	return &ConfigCache{
 		cfg:       cfg,
 		geo:       g,
-		stopCh:    make(chan struct{}),
 		status:    model.StatusLoading,
 		startedAt: time.Now(),
 	}
@@ -81,24 +80,37 @@ func (cc *ConfigCache) Init() {
 }
 
 func (cc *ConfigCache) Start() {
-	if cc.cfg.RefreshInterval > 0 {
-		cc.ticker = time.NewTicker(cc.cfg.RefreshInterval)
-		go func() {
-			for {
-				select {
-				case <-cc.ticker.C:
-					cc.refresh()
-				case <-cc.stopCh:
-					cc.ticker.Stop()
-					return
-				}
-			}
-		}()
+	interval := cc.cfg.RefreshInterval
+	if interval <= 0 {
+		interval = 30 * time.Minute
+		cc.cfg.RefreshInterval = interval
+		log.Printf("INFO: REFRESH_INTERVAL not set or invalid, defaulting to %v", interval)
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cc.tickerCancel = cancel
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				cc.refresh()
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	log.Printf("INFO: auto-refresh ticker started at %v interval", interval)
 }
 
 func (cc *ConfigCache) Stop() {
-	close(cc.stopCh)
+	if cc.tickerCancel != nil {
+		cc.tickerCancel()
+		cc.tickerCancel = nil
+	}
 }
 
 func (cc *ConfigCache) GetStartedAt() time.Time {
@@ -116,25 +128,36 @@ func (cc *ConfigCache) SetSubscriptionURL(url string) {
 func (cc *ConfigCache) SetRefreshInterval(d time.Duration) {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
+
+	if cc.tickerCancel != nil {
+		cc.tickerCancel()
+		cc.tickerCancel = nil
+	}
+
+	if d <= 0 {
+		d = 30 * time.Minute
+		log.Printf("WARN: invalid REFRESH_INTERVAL=%v, falling back to %v", cc.cfg.RefreshInterval, d)
+	}
+
 	cc.cfg.RefreshInterval = d
-	// Restart ticker with new interval
-	if cc.ticker != nil {
-		cc.ticker.Stop()
-	}
-	if d > 0 {
-		cc.ticker = time.NewTicker(d)
-		go func() {
-			for {
-				select {
-				case <-cc.ticker.C:
-					cc.refresh()
-				case <-cc.stopCh:
-					cc.ticker.Stop()
-					return
-				}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cc.tickerCancel = cancel
+
+	ticker := time.NewTicker(d)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				cc.refresh()
+			case <-ctx.Done():
+				ticker.Stop()
+				return
 			}
-		}()
-	}
+		}
+	}()
+
+	log.Printf("INFO: auto-refresh ticker restarted at %v interval", d)
 }
 
 func (cc *ConfigCache) Refresh() {
@@ -144,14 +167,22 @@ func (cc *ConfigCache) Refresh() {
 func (cc *ConfigCache) refresh() {
 	log.Println("INFO: refreshing configs...")
 
-	if cc.cfg.MockConfigs {
+	// Snapshot relevant config fields atomically to avoid data race
+	cc.mu.RLock()
+	mockConfigs := cc.cfg.MockConfigs
+	subscriptionURL := cc.cfg.SubscriptionURL
+	pingTimeout := cc.cfg.PingTimeout
+	skipVerifyTLS := cc.cfg.SkipVerifyTLS
+	cc.mu.RUnlock()
+
+	if mockConfigs {
 		log.Println("INFO: MOCK_CONFIGS=true, loading mock configs")
 		cc.loadMockConfigs()
 		cc.setStatus(model.StatusReady, "Mock configs loaded")
 		return
 	}
 
-	if cc.cfg.SubscriptionURL == "" {
+	if subscriptionURL == "" {
 		log.Println("WARN: SUBSCRIPTION_URL not set, skipping refresh")
 		cc.setStatus(model.StatusError, "SUBSCRIPTION_URL not configured")
 		return
@@ -159,7 +190,7 @@ func (cc *ConfigCache) refresh() {
 
 	cc.setStatus(model.StatusLoading, "Fetching subscription...")
 
-	raw, err := fetcher.FetchSubscription(cc.cfg.SubscriptionURL, 30*time.Second)
+	raw, err := fetcher.FetchSubscription(subscriptionURL, 30*time.Second)
 	if err != nil {
 		log.Printf("ERROR: fetch failed: %v", err)
 		cc.setStatus(model.StatusError, "Failed to fetch subscription: "+err.Error())
@@ -192,7 +223,7 @@ func (cc *ConfigCache) refresh() {
 
 	cc.setStatus(model.StatusTesting, "Testing configs...")
 
-	tested := tester.TestConfigs(parsed, cc.cfg.PingTimeout, cc.cfg.SkipVerifyTLS)
+	tested := tester.TestConfigs(parsed, pingTimeout, skipVerifyTLS)
 	log.Printf("INFO: %d/%d configs passed connectivity test", len(tested), len(parsed))
 
 	if len(tested) == 0 {

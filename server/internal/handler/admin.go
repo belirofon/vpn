@@ -147,6 +147,13 @@ func SetupAdminRoutes(r *gin.Engine, cfg *config.Config, cc *cache.ConfigCache) 
 					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_refresh_interval"})
 					return
 				}
+				if d <= 0 {
+					c.JSON(http.StatusBadRequest, gin.H{
+						"error":   "invalid_refresh_interval",
+						"message": "REFRESH_INTERVAL must be positive (e.g. \"30m\", \"1h\")",
+					})
+					return
+				}
 				cfg.RefreshInterval = d
 				cc.SetRefreshInterval(d)
 				updates = append(updates, "REFRESH_INTERVAL")
