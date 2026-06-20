@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	utls "github.com/refraction-networking/utls"
 	"vpn-server/internal/model"
 )
 
@@ -31,7 +32,12 @@ func testVlessProxy(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration, 
 		}
 		tlsConn = tc
 	case "reality":
-		// REALITY needs uTLS (requires Go 1.24+).
+		tc, err := testRealityHandshake(conn, cfg, timeout)
+		if err != nil {
+			return false
+		}
+		tlsConn = tc
+
 	}
 
 	// For WebSocket transport: do WS upgrade, then send VLESS via WS frames
@@ -222,6 +228,55 @@ func readWSFrame(conn net.Conn) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// testRealityHandshake performs a REALITY TLS handshake using uTLS
+// to mimic a browser fingerprint. Returns the uTLS connection for further
+// VLESS protocol testing.
+func testRealityHandshake(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration) (net.Conn, error) {
+	sni := cfg.SNI
+	if sni == "" {
+		sni = cfg.Server
+	}
+
+	uconn := utls.UClient(conn, &utls.Config{
+		ServerName: sni,
+	}, getClientHelloID(cfg.FP))
+
+	if err := uconn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		uconn.Close()
+		return nil, err
+	}
+
+	if err := uconn.Handshake(); err != nil {
+		uconn.Close()
+		return nil, err
+	}
+
+	return uconn, nil
+}
+
+// getClientHelloID maps a fingerprint string to a uTLS ClientHelloID.
+// Supports common REALITY fingerprint values. Defaults to Chrome if unknown.
+func getClientHelloID(fp string) utls.ClientHelloID {
+	switch strings.ToLower(fp) {
+	case "chrome":
+		return utls.HelloChrome_Auto
+	case "firefox":
+		return utls.HelloFirefox_Auto
+	case "safari":
+		return utls.HelloSafari_Auto
+	case "ios":
+		return utls.HelloIOS_Auto
+	case "android":
+		return utls.HelloAndroid_11_OkHttp
+	case "edge":
+		return utls.HelloEdge_Auto
+	case "random", "randomized":
+		return utls.HelloRandomized
+	default:
+		return utls.HelloChrome_Auto
+	}
 }
 
 func parseUUID(s string) []byte {
