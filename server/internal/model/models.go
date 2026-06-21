@@ -26,9 +26,12 @@ type VpnConfig struct {
 	SNI       string `json:"sni,omitempty"`
 	FP        string `json:"fp,omitempty"`
 	ALPN      string `json:"alpn,omitempty"`
-	Pbk       string `json:"pbk,omitempty"`
-	Sid       string `json:"sid,omitempty"`
-	LatencyMs int64  `json:"latency_ms"`
+	Pbk        string `json:"pbk,omitempty"`
+	Sid        string `json:"sid,omitempty"`
+	Spx        string `json:"spx,omitempty"`
+	Flow       string `json:"flow,omitempty"`
+	Encryption string `json:"encryption,omitempty"`
+	LatencyMs  int64  `json:"latency_ms"`
 	Country   string `json:"country"`
 	RawLink   string `json:"raw_link,omitempty"`
 }

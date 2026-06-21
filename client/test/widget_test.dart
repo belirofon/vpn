@@ -1,11 +1,52 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/data/api/api_client.dart';
 import 'package:vpn_client/data/models/vpn_config.dart';
+import 'package:vpn_client/core/update/update_service.dart';
 import 'package:vpn_client/core/vpn/vpn_service.dart';
 import 'package:vpn_client/presentation/screens/home_screen.dart';
 import 'package:dio/dio.dart';
+
+/// Mock ApiClient — returns empty configs without timers.
+class MockApiClient extends ApiClient {
+  MockApiClient() : super(createMockDio());
+
+  @override
+  Future<List<VpnConfig>> getConfigs() async => [];
+
+  @override
+  Future<bool> healthCheck() async => true;
+}
+
+Dio createMockDio() {
+  final dio = Dio();
+  dio.httpClientAdapter = NoopHttpClientAdapter();
+  return dio;
+}
+
+class NoopHttpClientAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    throw UnimplementedError('not used');
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+// Mock UpdateService — always returns no updates
+class MockUpdateService extends UpdateService {
+  MockUpdateService() : super(MockApiClient());
+
+  @override
+  Future<UpdateInfo?> checkForUpdate() async => null;
+}
 
 // Mock VpnService for testing UI in isolation
 class MockVpnService implements VpnService {
@@ -47,19 +88,34 @@ void main() {
     late MockVpnService vpnService;
 
     setUp(() {
-      apiClient = ApiClient(Dio());
+      apiClient = MockApiClient();
       vpnService = MockVpnService();
     });
 
-    testWidgets('shows disconnected state initially', (tester) async {
+    tearDown(() async {
+      // Allow pending microtasks from _fetchConfigs to drain
+      await Future<void>.delayed(Duration.zero);
+    });
+
+    /// Pumps twice to fully initialize HomeScreen (initState → _fetchConfigs → rebuild).
+    Future<void> pumpHomeScreen(WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
             apiClient: apiClient,
             vpnService: vpnService,
+            updateService: MockUpdateService(),
           ),
         ),
       );
+      // First pump: process initial build + drain microtasks
+      await tester.pump();
+      // Second pump: process setState from _fetchConfigs completion
+      await tester.pump();
+    }
+
+    testWidgets('shows disconnected state initially', (tester) async {
+      await pumpHomeScreen(tester);
 
       expect(find.text('Disconnected'), findsOneWidget);
       expect(find.text('CONNECT'), findsOneWidget);
@@ -67,31 +123,17 @@ void main() {
     });
 
     testWidgets('shows error state when no server available', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await pumpHomeScreen(tester);
 
-      // Tap connect button — fails because no server, shows error
+      // Tap connect button — fails because no configs available
       await tester.tap(find.text('CONNECT'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.textContaining('Server unavailable'), findsOneWidget);
+      expect(find.textContaining('No configs available'), findsOneWidget);
     });
 
     testWidgets('debug menu opens on long press', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await pumpHomeScreen(tester);
 
       // Long press the shield icon
       await tester.longPress(find.byIcon(Icons.shield_outlined));
@@ -102,14 +144,7 @@ void main() {
     });
 
     testWidgets('shows app title', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await pumpHomeScreen(tester);
 
       expect(find.text('VPN Client'), findsOneWidget);
     });

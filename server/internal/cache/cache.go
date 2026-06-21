@@ -111,7 +111,57 @@ func (cc *ConfigCache) Start() {
 
 // Stop stops the periodic refresh ticker.
 func (cc *ConfigCache) Stop() {
-	close(cc.stopCh)
+	if cc.tickerCancel != nil {
+		cc.tickerCancel()
+		cc.tickerCancel = nil
+	}
+}
+
+func (cc *ConfigCache) GetStartedAt() time.Time {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.startedAt
+}
+
+func (cc *ConfigCache) SetSubscriptionURL(url string) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.cfg.SubscriptionURL = url
+}
+
+func (cc *ConfigCache) SetRefreshInterval(d time.Duration) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	if cc.tickerCancel != nil {
+		cc.tickerCancel()
+		cc.tickerCancel = nil
+	}
+
+	if d <= 0 {
+		d = 30 * time.Minute
+		log.Printf("WARN: invalid REFRESH_INTERVAL=%v, falling back to %v", cc.cfg.RefreshInterval, d)
+	}
+
+	cc.cfg.RefreshInterval = d
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cc.tickerCancel = cancel
+
+	ticker := time.NewTicker(d)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				cc.refresh()
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	log.Printf("INFO: auto-refresh ticker restarted at %v interval", d)
 }
 
 // Refresh triggers an async refresh.

@@ -1,17 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models/vpn_config.dart';
+import '../../core/update/update_service.dart';
 import '../../core/vpn/vpn_service.dart';
+import '../widgets/server_info_card.dart';
+import '../widgets/debug_sheet.dart';
+import '../widgets/version_info.dart';
+import 'admin_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
   final VpnService vpnService;
+  final UpdateService updateService;
 
   const HomeScreen({
     super.key,
     required this.apiClient,
     required this.vpnService,
+    required this.updateService,
   });
 
   @override
@@ -21,11 +29,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   VpnConnectionState _connectionState = VpnConnectionState.disconnected;
-  VpnConfig? _activeConfig;
   StreamSubscription<VpnConnectionState>? _stateSub;
   String? _errorMessage;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  List<VpnConfig> _configs = [];
+  int _currentIndex = 0;
+  bool _isLoadingConfigs = true;
 
   @override
   void initState() {
@@ -39,6 +50,133 @@ class _HomeScreenState extends State<HomeScreen>
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _fetchConfigs();
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final info = await widget.updateService.checkForUpdate();
+      if (info == null || !mounted) return;
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!widget.updateService.isNewer(packageInfo.version, info)) return;
+      if (!mounted) return;
+
+      _showUpdateDialog(info);
+    } catch (_) {}
+  }
+
+  void _showUpdateDialog(UpdateInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        String? downloadingPath;
+        double? downloadProgress;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Update v${info.version}'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Available changes:',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text(info.changelog, style: const TextStyle(fontSize: 13)),
+                    if (downloadProgress != null) ...[
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(value: downloadProgress),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(downloadProgress! * 100).toInt()}%',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                    if (downloadingPath != null) ...[
+                      const SizedBox(height: 12),
+                      const Text('Download complete.',
+                          style: TextStyle(color: Colors.green)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'If the installer did not open, enable\n"Install unknown apps" in app settings.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (downloadingPath == null)
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Later'),
+                  ),
+                if (downloadProgress == null && downloadingPath == null)
+                  FilledButton(
+                    onPressed: () async {
+                      setDialogState(() => downloadProgress = 0);
+                      try {
+                        final path = await widget.updateService.downloadApk(
+                          url: info.downloadUrl,
+                          onProgress: (received, total) {
+                            if (total > 0) {
+                              setDialogState(() =>
+                                  downloadProgress = received / total);
+                            }
+                          },
+                        );
+                        setDialogState(() => downloadingPath = path);
+                        await widget.updateService.installApk(path);
+                      } catch (_) {
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                          _showErrorSnackBar('Download failed. Try again later.');
+                        }
+                      }
+                    },
+                    child: const Text('Update'),
+                  ),
+                if (downloadingPath != null)
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Close'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _fetchConfigs() async {
+    setState(() => _isLoadingConfigs = true);
+    final configs = await widget.apiClient.getConfigs();
+    if (!mounted) return;
+    setState(() {
+      _configs = configs.take(10).toList();
+      _currentIndex = 0;
+      _isLoadingConfigs = false;
+    });
+  }
+
+  void _goToPrev() {
+    if (_currentIndex > 0) {
+      setState(() => _currentIndex--);
+    }
+  }
+
+  void _goToNext() {
+    if (_currentIndex < _configs.length - 1) {
+      setState(() => _currentIndex++);
+    }
   }
 
   @override
@@ -53,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _connectionState = state;
       if (state == VpnConnectionState.disconnected) {
-        _activeConfig = null;
         _errorMessage = null;
       }
     });
@@ -74,19 +211,16 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() => _errorMessage = null);
 
+    if (_configs.isEmpty) {
+      setState(() {
+        _errorMessage = 'No configs available.\nCheck that the server is running.';
+      });
+      return;
+    }
+
     try {
-      final config = await widget.apiClient.getBestConfig();
-      if (!mounted) return;
-
-      if (config == null) {
-        setState(() {
-          _errorMessage = 'Server unavailable.\nCheck that the server is running.';
-        });
-        return;
-      }
-
+      final config = _configs[_currentIndex];
       await widget.vpnService.connect(config);
-      if (mounted) setState(() => _activeConfig = config);
     } catch (e) {
       if (mounted) {
         _showErrorSnackBar(e.toString());
@@ -108,7 +242,16 @@ class _HomeScreenState extends State<HomeScreen>
   void _showDebugMenu() {
     showModalBottomSheet(
       context: context,
-      builder: (_) => _DebugSheet(apiClient: widget.apiClient),
+      builder: (_) => DebugSheet(apiClient: widget.apiClient),
+    );
+  }
+
+  void _openAdminLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminLoginScreen(apiClient: widget.apiClient),
+      ),
     );
   }
 
@@ -127,6 +270,13 @@ class _HomeScreenState extends State<HomeScreen>
       appBar: AppBar(
         title: const Text('VPN Client'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Admin',
+            onPressed: _openAdminLogin,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -185,8 +335,22 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 8),
                 // Server info
-                if (_activeConfig != null)
-                  _ServerInfoCard(config: _activeConfig!),
+                if (_isLoadingConfigs)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  )
+                else if (_configs.isNotEmpty)
+                  ServerInfoCard(
+                    config: _configs[_currentIndex],
+                    currentIndex: _currentIndex,
+                    totalCount: _configs.length,
+                    onPrev: _goToPrev,
+                    onNext: _goToNext,
+                  ),
                 // Error message
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
@@ -263,6 +427,8 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                const VersionInfo(),
                 const Spacer(flex: 1),
               ],
             ),
@@ -279,167 +445,5 @@ class _HomeScreenState extends State<HomeScreen>
       VpnConnectionState.error => 'Error',
       VpnConnectionState.disconnected => 'Disconnected',
     };
-  }
-}
-
-// -- Server info card --
-
-class _ServerInfoCard extends StatelessWidget {
-  final VpnConfig config;
-
-  const _ServerInfoCard({required this.config});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.dns_outlined, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(config.name, style: theme.textTheme.bodyLarge),
-            const SizedBox(width: 4),
-            Text(
-              '(${config.country})',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-            const SizedBox(width: 16),
-            Icon(Icons.speed, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 4),
-            Text(
-              '${config.latencyMs}ms',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// -- Debug settings sheet --
-
-class _DebugSheet extends StatefulWidget {
-  final ApiClient apiClient;
-
-  const _DebugSheet({required this.apiClient});
-
-  @override
-  State<_DebugSheet> createState() => _DebugSheetState();
-}
-
-class _DebugSheetState extends State<_DebugSheet> {
-  late TextEditingController _urlController;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController = TextEditingController(
-      text: widget.apiClient.serverUrl ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveUrl() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-
-    setState(() => _isSaving = true);
-    await widget.apiClient.saveServerUrl(url);
-
-    if (mounted) {
-      setState(() => _isSaving = false);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Server URL saved'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 24,
-        right: 24,
-        top: 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.build_outlined, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Debug Settings',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Server URL',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _urlController,
-            decoration: InputDecoration(
-              hintText: 'https://belirofon-vpn.duckdns.org:8443',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _isSaving ? null : _saveUrl,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('SAVE'),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
   }
 }

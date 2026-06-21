@@ -125,6 +125,9 @@ func parseVless(cfg *model.VpnConfig, u *url.URL) {
 	cfg.ALPN = q.Get("alpn")
 	cfg.Pbk = q.Get("pbk")
 	cfg.Sid = q.Get("sid")
+	cfg.Spx = q.Get("spx")
+	cfg.Flow = q.Get("flow")
+	cfg.Encryption = q.Get("encryption")
 
 	// Name priority: remark query > fragment (after #) > host
 	if v := q.Get("remark"); v != "" {

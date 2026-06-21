@@ -86,11 +86,13 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	conn.SetDeadline(time.Now().Add(timeout))
 
 	switch {
-	// VLESS: full proxy test through a domain-based target (tests DNS + protocol + forwarding)
 	case cfg.Protocol == "vless" && cfg.TLS != "reality":
 		if !testVlessProxy(conn, cfg, timeout, skipVerifyTLS) {
 			return pingResult{OK: false}
 		}
+
+	case cfg.Protocol == "vless" && cfg.TLS == "reality":
+		// TCP+latency only — full protocol test needs uTLS (Go 1.24+)
 
 	// Trojan: simple password-authenticated proxy test
 	case cfg.Protocol == "trojan":

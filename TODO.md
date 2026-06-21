@@ -43,7 +43,7 @@
 
 ---
 
-## ⬜ Фаза 2 — Архитектура
+## ⬜ Фаза 2 — Архитектура (Go server)
 
 ### Сервер (Go) — в основном выполнено
 - [x] **Рефакторинг `cache.refresh()`** — выделен модуль `internal/pipeline/pipeline.go`
@@ -65,11 +65,11 @@
 
 ---
 
-## ⬜ Фаза 3 — Code Quality & Cleanup
+## ⬜ Фаза 4 — Code Quality & Cleanup
 
 ### Разделение home_screen.dart
-- [ ] Вынести `_ServerInfoCard` → `presentation/widgets/server_info_card.dart`
-- [ ] Вынести `_DebugSheet` → `presentation/widgets/debug_sheet.dart`
+- [x] **Вынести `_ServerInfoCard`** → `presentation/widgets/server_info_card.dart`
+- [x] **Вынести `_DebugSheet`** → `presentation/widgets/debug_sheet.dart`
 - [ ] Вынести строки UI в константы/локализацию
 
 ### Остальное
@@ -91,6 +91,104 @@
 - [ ] **Авто-подключение при запуске**
 - [ ] **WireGuard protocol support**
 - [ ] **Multi-user support** — per-user config cache
+
+---
+
+## 🟡 Фаза 8 — Whitelist bypass (отложено, реализация не на один день)
+
+### Как на самом деле работает ТСПУ с белыми списками
+Двухуровневый фильтр:
+1. **CIDR (IP-уровень)** — пакеты на не-whitelisted IP просто дропаются на уровне маршрутизатора
+2. **SNI (прикладной уровень)** — если IP пропущен, проверяется SNI в TLS ClientHello
+
+**REALITY обходит SNI** (маскируется под `yandex.ru`), но **НЕ обходит IP-фильтр**.
+
+### Единственный работающий метод (2026): Chain (Relay)
+```
+Клиент → [Российский VPS с whitelisted IP] → [Сервер (EU)] → Интернет
+                                     ↓
+                              Российские сайты (DIRECT)
+```
+
+- **Российский VPS**: Timeweb / VDSina / Selectel (300-500 руб/мес)
+- **Xray на релее**: inbound от клиента → outbound (VLESS+REALITY) на сервер в EU
+- **Direct для RU**: Яндекс, ВК, Госуслуги и т.д. — напрямую с релея
+- **Yandex Cloud — не работает**: AS Yandex.Cloud блокируется отдельно от AS Yandex LLC
+
+### Резервный метод: Bootstrap конфиги в APK
+- Вшить 2-3 публичных VLESS+REALITY конфига в `assets/bootstrap_configs.json`
+- При первом запуске: если сервер недоступен → подключиться через bootstrap
+- После подключения — обновить конфиги с API сервера
+- Минус: конфиги могут умереть, надо обновлять
+
+### Cloudflare — не работает (заблокирован ТСПУ с 2025)
+
+### Что нужно будет сделать
+- [ ] **Выбрать провайдера** для российского VPS (Timeweb / VDSina / Selectel)
+- [ ] **Настроить Xray relay** на российском VPS (inbound от клиента → outbound на наш сервер)
+- [ ] **Docker-образ для релея** или ansible-скрипт для быстрого развёртывания
+- [ ] **Обновить TODO**: routing правила для DIRECT (российские сайты) через relay
+- [ ] **CI**: добавить деплой конфига релея
+- [ ] **Bootstrap конфиги** (резерв): вшить в APK публичные REALITY конфиги как fallback
+
+---
+
+## ⬜ Фаза 9 — Cloudflare WARP генерация конфигов
+
+### Цель
+Генерировать собственные WARP (WireGuard) конфиги через Cloudflare API, чтобы не зависеть от сторонних подписок или дополнять их.
+
+### Как работает
+Cloudflare WARP использует WireGuard. Регистрация устройства:
+- `POST https://api.cloudflareclient.com/v0a<version>/reg`
+- Возвращает приватный ключ, адрес, DNS
+- Публичный ключ Cloudflare фиксированный
+
+### Что нужно сделать
+- [ ] **Сервер: WARP генератор** — новый пакет `internal/warp/` 
+  - Регистрация нового устройства через Cloudflare API
+  - Парсинг ответа в формате WireGuard config
+  - Периодическая регенерация (конфиги живут N дней)
+- [ ] **Сервер: добавить WARP конфиги в пул** — объединять с existing конфигами из подписок
+- [ ] **Клиент: WireGuard поддержка** — для подключения к WARP конфигам (либо через Xray-core, либо напрямую)
+- [ ] **Клиент: UI метка "WARP"** — отличать WARP конфиги от прокси
+
+---
+
+## 🟡 Фаза 10 — Внутриприложные обновления (self-hosted APK) — РЕАЛИЗОВАНО (ждёт деплоя)
+
+### Проблема
+GitHub может быть недоступен в РФ. Релизные APK на GitHub Releases не скачать из приложения.
+
+### Решение
+Хостить APK на нашем сервере, обновляться через приложение.
+
+### Что сделано
+- [x] **Сервер: эндпоинт `GET /api/update`** — отдаёт JSON с версией из `version.json`
+- [x] **Сервер: раздача APK** — `GET /api/update/download` стримит APK файл
+- [x] **CI: загрузка APK на сервер** — appleboy/scp-action + обновление `version.json` через SSH
+- [x] **Клиент: `UpdateService`** — проверка версии, сравнение, скачивание с прогрессом
+- [x] **Клиент: установка APK** — MethodChannel → FileProvider → `Intent.ACTION_VIEW`
+- [x] **Клиент: UI диалог** — AlertDialog с changelog, прогрессом, кнопками "Update"/"Later"
+
+### Файлы
+- `server/internal/handler/update.go` — эндпоинты /api/update и /api/update/download
+- `server/apk/version.json` — метаданные версии
+- `server/docker-compose.yml` — mount `./apk:/app/apk:ro`
+- `.github/workflows/build-android.yml` — SCP + SSH обновление version.json
+- `client/lib/core/update/update_service.dart` — UpdateService (check, download, install)
+- `client/lib/data/api/api_client.dart` — checkForUpdate()
+- `client/lib/presentation/screens/home_screen.dart` — диалог обновления
+- `client/android/app/src/main/kotlin/.../MainActivity.kt` — MethodChannel installApk
+- `client/android/app/src/main/res/xml/file_paths.xml` — FileProvider paths
+- `client/android/app/src/main/AndroidManifest.xml` — provider + REQUEST_INSTALL_PACKAGES
+
+### Чтобы заработало
+1. Передеплоить сервер (чтобы подхватился монтирование `apk/`)
+2. Запушить тег `v*` — CI зальёт APK на сервер и обновит version.json
+3. На телефоне откроется приложение → диалог с предложением обновления
+
+---
 
 ---
 

@@ -1,15 +1,14 @@
 import 'dart:async';
-import 'package:flutter_v2ray_plus/flutter_v2ray.dart';
+import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import '../../data/models/vpn_config.dart';
 import 'vpn_service.dart';
 
 class MobileVpnService implements VpnService {
-  final FlutterV2ray _v2ray = FlutterV2ray();
+  late final V2ray _v2ray;
   final StreamController<VpnConnectionState> _stateController =
       StreamController<VpnConnectionState>.broadcast();
   VpnConnectionState _currentState = VpnConnectionState.disconnected;
   bool _initialized = false;
-  StreamSubscription<VlessStatus>? _statusSub;
 
   @override
   VpnConnectionState get currentState => _currentState;
@@ -17,19 +16,13 @@ class MobileVpnService implements VpnService {
   @override
   Stream<VpnConnectionState> get state => _stateController.stream;
 
-  Future<void> initialize({
-    String providerBundleIdentifier = 'com.example.vpn.VPNProvider',
-    String groupIdentifier = 'group.com.example.vpn',
-  }) async {
+  MobileVpnService() {
+    _v2ray = V2ray(onStatusChanged: _onStatusChanged);
+  }
+
+  Future<void> initialize() async {
     if (_initialized) return;
-
-    await _v2ray.initializeVless(
-      providerBundleIdentifier: providerBundleIdentifier,
-      groupIdentifier: groupIdentifier,
-    );
-
-    _statusSub = _v2ray.onStatusChanged.listen(_onStatusChanged);
-
+    await _v2ray.initialize();
     _initialized = true;
   }
 
@@ -53,48 +46,39 @@ class MobileVpnService implements VpnService {
         throw Exception('VPN permission denied');
       }
 
-      final parsed = FlutterV2ray.parseFromURL(config.rawLink!);
+      final parsed = V2ray.parseFromURL(config.rawLink!);
 
-      // Fix 1: Enable DNS sniffing so V2Ray intercepts DNS queries
-      // Without this, UDP DNS requests hit the TCP-only VLESS outbound and get dropped
+      // Enable DNS sniffing so V2Ray intercepts DNS queries
       parsed.inbound["sniffing"] = {
         "enabled": true,
         "destOverride": ["http", "tls"],
       };
 
-      // Fix 2: Set DNS servers (V2Ray uses these internally for sniffing)
+      // Set DNS servers
       parsed.dns = {
         "servers": [
-          "https://1.1.1.1/dns-query", // DNS-over-HTTPS bypasses carrier blocking
+          "https://1.1.1.1/dns-query",
           "1.1.1.1",
         ],
       };
 
-      // Fix 3: Explicit routing — UDP bypasses proxy (VLESS+WS is TCP-only),
-      // TCP goes through proxy
-      parsed.routing = {
-        "domainStrategy": "UseIp",
-        "rules": [
-          {
-            "type": "field",
-            "network": "udp",
-            "outboundTag": "direct",
-          },
-          {
-            "type": "field",
-            "network": "tcp",
-            "outboundTag": "proxy",
-          },
-        ],
-      };
+      // For TCP-only protocols (WS, etc.) — route UDP directly, TCP through proxy.
+      // For REALITY (XTLS Vision) — skip override, XTLS handles both TCP/UDP.
+      if (config.tls != 'reality') {
+        parsed.routing = {
+          "domainStrategy": "UseIp",
+          "rules": [
+            {"type": "field", "network": "udp", "outboundTag": "direct"},
+            {"type": "field", "network": "tcp", "outboundTag": "proxy"},
+          ],
+        };
+      }
 
       final configJson = parsed.getFullConfiguration();
 
-      await _v2ray.startVless(
+      await _v2ray.startV2Ray(
         remark: config.name,
         config: configJson,
-        // Also set DNS on the native VPN tunnel to match
-        dnsServers: ["1.1.1.1"],
       );
     } catch (e) {
       _setState(VpnConnectionState.error);
@@ -105,7 +89,7 @@ class MobileVpnService implements VpnService {
   @override
   Future<void> disconnect() async {
     try {
-      await _v2ray.stopVless();
+      await _v2ray.stopV2Ray();
     } finally {
       _setState(VpnConnectionState.disconnected);
     }
@@ -113,11 +97,10 @@ class MobileVpnService implements VpnService {
 
   @override
   void dispose() {
-    _statusSub?.cancel();
     _stateController.close();
   }
 
-  void _onStatusChanged(VlessStatus status) {
+  void _onStatusChanged(V2RayStatus status) {
     switch (status.state.toUpperCase()) {
       case 'CONNECTED':
         _setState(VpnConnectionState.connected);

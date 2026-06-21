@@ -74,6 +74,8 @@ type Config struct {
 	MockConfigs      bool
 	SkipVerifyTLS    bool   // SKIP_VERIFY_TLS — skip TLS cert verification (default: true for proxy testing compat)
 	CORSOrigins      string // CORS_ORIGINS — allowed CORS origins (default: *)
+	AdminEmail       string // ADMIN_EMAIL — admin login email
+	AdminPassword    string // ADMIN_PASSWORD — admin login password
 }
 
 func LoadConfig() Config {
@@ -86,6 +88,8 @@ func LoadConfig() Config {
 		MockConfigs:      os.Getenv("MOCK_CONFIGS") == "true",
 		SkipVerifyTLS:    os.Getenv("SKIP_VERIFY_TLS") != "false",
 		CORSOrigins:      getEnv("CORS_ORIGINS", "*"),
+		AdminEmail:       os.Getenv("ADMIN_EMAIL"),
+		AdminPassword:    os.Getenv("ADMIN_PASSWORD"),
 	}
 	return cfg
 }
