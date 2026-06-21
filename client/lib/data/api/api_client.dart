@@ -94,6 +94,120 @@ class ApiClient {
     }
   }
 
+  // -- Admin API methods --
+
+  Future<String?> adminLogin(String email, String password) async {
+    final url = serverUrl;
+    if (url == null) return null;
+
+    try {
+      final response = await _dio.post(
+        '$url/api/admin/login',
+        data: {'email': email, 'password': password},
+      );
+      if (response.statusCode == 200 && response.data['token'] != null) {
+        final token = response.data['token'] as String;
+        await _prefs?.setString('admin_token', token);
+        return token;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminLogin error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> adminHealth() async {
+    return _adminGet('/api/admin/health');
+  }
+
+  Future<Map<String, dynamic>?> adminEndpoints() async {
+    return _adminGet('/api/admin/endpoints');
+  }
+
+  Future<Map<String, dynamic>?> adminGetConfig() async {
+    return _adminGet('/api/admin/config');
+  }
+
+  Future<bool> adminUpdateConfig({
+    String? subscriptionUrl,
+    String? refreshInterval,
+  }) async {
+    final url = serverUrl;
+    final token = _prefs?.getString('admin_token');
+    if (url == null || token == null) return false;
+
+    try {
+      final body = <String, dynamic>{};
+      if (subscriptionUrl != null) body['subscription_url'] = subscriptionUrl;
+      if (refreshInterval != null) body['refresh_interval'] = refreshInterval;
+      final response = await _dio.put(
+        '$url/api/admin/config',
+        data: body,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminUpdateConfig error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminRefreshConfigs() async {
+    final url = serverUrl;
+    final token = _prefs?.getString('admin_token');
+    if (url == null || token == null) return false;
+
+    try {
+      final response = await _dio.post(
+        '$url/api/admin/refresh-configs',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminRefreshConfigs error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminLogout() async {
+    final url = serverUrl;
+    final token = _prefs?.getString('admin_token');
+    if (url == null || token == null) return false;
+
+    try {
+      await _dio.post(
+        '$url/api/admin/logout',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      await _prefs?.remove('admin_token');
+      return true;
+    } catch (e) {
+      debugPrint('ApiClient.adminLogout error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _adminGet(String path) async {
+    final url = serverUrl;
+    final token = _prefs?.getString('admin_token');
+    if (url == null || token == null) return null;
+
+    try {
+      final response = await _dio.get(
+        '$url$path',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient._adminGet($path) error: $e');
+      return null;
+    }
+  }
+
   String _normalizeUrl(String url) {
     return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
   }

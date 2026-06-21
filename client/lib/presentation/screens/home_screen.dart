@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models/vpn_config.dart';
 import '../../core/vpn/vpn_service.dart';
+import 'admin_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -112,6 +113,15 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  void _openAdminLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminLoginScreen(apiClient: widget.apiClient),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -127,6 +137,13 @@ class _HomeScreenState extends State<HomeScreen>
       appBar: AppBar(
         title: const Text('VPN Client'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Admin Panel',
+            onPressed: () => _openAdminLogin(),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(

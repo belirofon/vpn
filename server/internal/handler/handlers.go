@@ -93,4 +93,6 @@ func SetupRoutes(r *gin.Engine, c *cache.ConfigCache) {
 			}
 		})
 	}
+
+	SetupAdminRoutes(r, c)
 }

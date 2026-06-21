@@ -47,7 +47,7 @@ func TestRun_MockConfigs(t *testing.T) {
 	cfg := config.Config{
 		MockConfigs: true,
 	}
-	p := New(cfg, nil, nil)
+	p := New(&cfg, nil, nil)
 	result, err := p.Run(context.Background())
 
 	if err != nil {
@@ -62,7 +62,7 @@ func TestRun_NoSubscriptionURL(t *testing.T) {
 	cfg := config.Config{
 		MockConfigs: false,
 	}
-	p := New(cfg, nil, nil)
+	p := New(&cfg, nil, nil)
 	_, err := p.Run(context.Background())
 
 	if err == nil {

@@ -16,10 +16,12 @@ import (
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
 	mu        sync.RWMutex
+	cfg       config.Config
 	status    model.ServerStatus
 	statusMsg string
 	configs   []model.VpnConfig
 	updated   time.Time
+	startedAt time.Time
 	pl        *pipeline.Pipeline
 	ticker    *time.Ticker
 	stopCh    chan struct{}
@@ -31,12 +33,15 @@ func NewCache(cfg config.Config, g *geo.DB, logger *slog.Logger) *ConfigCache {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &ConfigCache{
-		stopCh: make(chan struct{}),
-		status: model.StatusLoading,
-		pl:     pipeline.New(cfg, g, logger),
-		logger: logger,
+	cc := &ConfigCache{
+		cfg:       cfg,
+		stopCh:    make(chan struct{}),
+		status:    model.StatusLoading,
+		startedAt: time.Now(),
+		logger:    logger,
 	}
+	cc.pl = pipeline.New(&cc.cfg, g, logger)
+	return cc
 }
 
 func (cc *ConfigCache) setStatus(s model.ServerStatus, msg string) {
@@ -92,10 +97,10 @@ func (cc *ConfigCache) Start() {
 	if cc.ticker != nil {
 		return
 	}
-	if cc.pl == nil || cc.pl.Cfg().RefreshInterval <= 0 {
+	if cc.pl == nil || cc.cfg.RefreshInterval <= 0 {
 		return
 	}
-	cc.ticker = time.NewTicker(cc.pl.Cfg().RefreshInterval)
+	cc.ticker = time.NewTicker(cc.cfg.RefreshInterval)
 	go func() {
 		for {
 			select {
@@ -142,4 +147,37 @@ func (cc *ConfigCache) refresh() {
 		"fastest", result[0].Name,
 		"latency_ms", result[0].LatencyMs,
 	)
+}
+
+// GetStartedAt returns the time the cache was initialized.
+func (cc *ConfigCache) GetStartedAt() time.Time {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.startedAt
+}
+
+// Config returns a copy of the current server configuration.
+func (cc *ConfigCache) Config() config.Config {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.cfg
+}
+
+// SetSubscriptionURL updates the subscription URL at runtime.
+func (cc *ConfigCache) SetSubscriptionURL(url string) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.cfg.SubscriptionURL = url
+	cc.logger.Info("subscription URL updated", "url", url)
+}
+
+// SetRefreshInterval updates the refresh interval at runtime.
+func (cc *ConfigCache) SetRefreshInterval(d time.Duration) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.cfg.RefreshInterval = d
+	cc.logger.Info("refresh interval updated", "interval", d)
+	if cc.ticker != nil {
+		cc.ticker.Reset(d)
+	}
 }
