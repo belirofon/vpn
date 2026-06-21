@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'data/api/api_client.dart';
-import 'domain/services/vpn_service.dart';
 import 'core/vpn/mobile_vpn_service.dart';
 import 'core/vpn/web_vpn_service.dart';
-import 'presentation/viewmodels/home_viewmodel.dart';
+import 'data/api/api_client.dart';
+import 'domain/services/vpn_service.dart';
 import 'presentation/screens/home_screen.dart';
+import 'presentation/viewmodels/home_viewmodel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

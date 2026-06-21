@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/data/api/api_client.dart';
 import 'package:vpn_client/domain/entities/vpn_config.dart';
 import 'package:vpn_client/domain/services/vpn_service.dart';
-import 'package:vpn_client/presentation/viewmodels/home_viewmodel.dart';
 import 'package:vpn_client/presentation/screens/home_screen.dart';
+import 'package:vpn_client/presentation/viewmodels/home_viewmodel.dart';
 
 class MockVpnService implements VpnService {
   final _stateController = StreamController<VpnConnectionState>.broadcast();

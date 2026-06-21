@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/domain/entities/vpn_config.dart';
 import 'package:vpn_client/data/dto/vpn_config_dto.dart';
+import 'package:vpn_client/domain/entities/vpn_config.dart';
 
 void main() {
   group('VpnConfigDto.fromJson', () {

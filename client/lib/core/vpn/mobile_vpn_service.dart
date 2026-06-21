@@ -47,7 +47,7 @@ class MobileVpnService implements VpnService {
         await initialize();
       }
 
-      bool allowed = await _v2ray.requestPermission();
+      final bool allowed = await _v2ray.requestPermission();
       if (!allowed) {
         _setState(VpnConnectionState.error);
         throw Exception('VPN permission denied');
@@ -57,33 +57,33 @@ class MobileVpnService implements VpnService {
 
       // Fix 1: Enable DNS sniffing so V2Ray intercepts DNS queries
       // Without this, UDP DNS requests hit the TCP-only VLESS outbound and get dropped
-      parsed.inbound["sniffing"] = {
-        "enabled": true,
-        "destOverride": ["http", "tls"],
+      parsed.inbound['sniffing'] = {
+        'enabled': true,
+        'destOverride': ['http', 'tls'],
       };
 
       // Fix 2: Set DNS servers (V2Ray uses these internally for sniffing)
       parsed.dns = {
-        "servers": [
-          "https://1.1.1.1/dns-query", // DNS-over-HTTPS bypasses carrier blocking
-          "1.1.1.1",
+        'servers': [
+          'https://1.1.1.1/dns-query', // DNS-over-HTTPS bypasses carrier blocking
+          '1.1.1.1',
         ],
       };
 
       // Fix 3: Explicit routing — UDP bypasses proxy (VLESS+WS is TCP-only),
       // TCP goes through proxy
       parsed.routing = {
-        "domainStrategy": "UseIp",
-        "rules": [
+        'domainStrategy': 'UseIp',
+        'rules': [
           {
-            "type": "field",
-            "network": "udp",
-            "outboundTag": "direct",
+            'type': 'field',
+            'network': 'udp',
+            'outboundTag': 'direct',
           },
           {
-            "type": "field",
-            "network": "tcp",
-            "outboundTag": "proxy",
+            'type': 'field',
+            'network': 'tcp',
+            'outboundTag': 'proxy',
           },
         ],
       };
@@ -94,7 +94,7 @@ class MobileVpnService implements VpnService {
         remark: config.name,
         config: configJson,
         // Also set DNS on the native VPN tunnel to match
-        dnsServers: ["1.1.1.1"],
+        dnsServers: ['1.1.1.1'],
       );
     } catch (e) {
       _setState(VpnConnectionState.error);
