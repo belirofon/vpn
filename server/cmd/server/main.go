@@ -47,6 +47,7 @@ func main() {
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 
 	handler.SetupRoutes(r, c)
+	handler.SetupUpdateRoutes(r)
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

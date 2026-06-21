@@ -94,6 +94,19 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>?> checkForUpdate() async {
+    try {
+      final response = await _http.get('/api/app-info');
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.checkForUpdate error: $e');
+      return null;
+    }
+  }
+
   Future<bool> healthCheck() async {
     try {
       final response = await _http.get('/health');

@@ -75,6 +75,51 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/vpn-client-android.apk 2>/dev/null || \
           cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/vpn-client-android.apk
 
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          TAG="${TAG#v}"
+          echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+          # build number = 1 + commits since tag (fallback to unix timestamp)
+          echo "build_number=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK to server
+        if: vars.SERVER_URL != ''
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "client/build/app/outputs/flutter-apk/vpn-client-android.apk"
+          target: "~/vpn-server/apk/"
+          strip_components: 5
+
+      - name: Update version.json on server
+        if: vars.SERVER_URL != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/vpn-server
+            MIN_VER="${{ steps.version.outputs.version }}"
+            cat > apk/version.json <<VERSION_EOF
+            {
+              "version": "${{ steps.version.outputs.version }}",
+              "build_number": ${{ steps.version.outputs.build_number }},
+              "min_version": "${MIN_VER}",
+              "download_url": "https://${{ vars.DOMAIN }}:8443/api/update/download",
+              "changelog": "${{ github.event.release.body || 'See release notes on GitHub' }}"
+            }
+            VERSION_EOF
+            ls -la apk/
+            echo "=== version.json updated ==="
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

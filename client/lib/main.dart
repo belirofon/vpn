@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/update/update_service.dart';
 import 'core/vpn/mobile_vpn_service.dart';
 import 'core/vpn/web_vpn_service.dart';
 import 'data/api/api_client.dart';
@@ -22,6 +23,7 @@ void main() async {
   }
 
   final vpnService = _createVpnService();
+  final updateService = UpdateService(apiClient);
   final viewModel = HomeViewModel(
     apiClient: apiClient,
     vpnService: vpnService,
@@ -30,6 +32,7 @@ void main() async {
   runApp(VpnApp(
     apiClient: apiClient,
     viewModel: viewModel,
+    updateService: updateService,
   ));
 }
 
@@ -43,11 +46,13 @@ VpnService _createVpnService() {
 class VpnApp extends StatelessWidget {
   final ApiClient apiClient;
   final HomeViewModel viewModel;
+  final UpdateService updateService;
 
   const VpnApp({
     super.key,
     required this.apiClient,
     required this.viewModel,
+    required this.updateService,
   });
 
   @override
@@ -62,6 +67,7 @@ class VpnApp extends StatelessWidget {
       home: HomeScreen(
         apiClient: apiClient,
         viewModel: viewModel,
+        updateService: updateService,
       ),
     );
   }

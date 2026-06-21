@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/update/update_service.dart';
 import '../../data/api/api_client.dart';
 import '../../domain/entities/vpn_config.dart';
 import '../../domain/entities/warp_config.dart';
@@ -8,11 +10,13 @@ import 'admin_login_screen.dart';
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
   final HomeViewModel viewModel;
+  final UpdateService updateService;
 
   const HomeScreen({
     super.key,
     required this.apiClient,
     required this.viewModel,
+    required this.updateService,
   });
 
   @override
@@ -23,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  AppLifecycleListener? _lifecycleListener;
 
   @override
   void initState() {
@@ -36,13 +41,58 @@ class _HomeScreenState extends State<HomeScreen>
     );
     widget.viewModel.addListener(_onViewModelChanged);
     widget.viewModel.loadConfigs();
+    _checkForUpdate();
+
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _checkForUpdate,
+    );
   }
 
   @override
   void dispose() {
+    _lifecycleListener?.dispose();
     widget.viewModel.removeListener(_onViewModelChanged);
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final result = await widget.updateService.check();
+      if (result == null || !mounted) return;
+
+      if (result.status == UpdateStatus.required_) {
+        _showHardUpdateDialog(result.info);
+      } else if (result.status == UpdateStatus.suggested) {
+        _showSoftUpdateDialog(result.info);
+      }
+    } catch (_) {
+      // Network error — skip silently, app works offline.
+    }
+  }
+
+  void _showHardUpdateDialog(AppVersionInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _UpdateDialog(
+        info: info,
+        updateService: widget.updateService,
+        isHard: true,
+      ),
+    );
+  }
+
+  void _showSoftUpdateDialog(AppVersionInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _UpdateDialog(
+        info: info,
+        updateService: widget.updateService,
+        isHard: false,
+      ),
+    );
   }
 
   void _onViewModelChanged() {
@@ -782,6 +832,129 @@ class _DisconnectButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// -- Update dialog (hard / soft) --
+
+class _UpdateDialog extends StatefulWidget {
+  final AppVersionInfo info;
+  final UpdateService updateService;
+  final bool isHard;
+
+  const _UpdateDialog({
+    required this.info,
+    required this.updateService,
+    required this.isHard,
+  });
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  double? _progress;
+  String? _downloadedPath;
+  bool _failed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !widget.isHard || _downloadedPath != null,
+      child: AlertDialog(
+        title: Text(widget.isHard
+            ? 'Update Required'
+            : 'Update v${widget.info.latest}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.info.changelog.isNotEmpty) ...[
+                Text(
+                  'What\'s new:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.info.changelog,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (_progress != null) ...[
+                LinearProgressIndicator(value: _progress),
+                const SizedBox(height: 4),
+                Text(
+                  '${(_progress! * 100).toInt()}%',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+              if (_downloadedPath != null)
+                Text(
+                  'Download complete. Installing…',
+                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
+                ),
+              if (_failed)
+                Text(
+                  'Download failed. Please try again later.',
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          if (!widget.isHard && _progress == null && _downloadedPath == null)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Later'),
+            ),
+          if (_progress == null && _downloadedPath == null && !_failed)
+            FilledButton(
+              onPressed: _startDownload,
+              child: Text(widget.isHard ? 'Update Now' : 'Update'),
+            ),
+          if (_failed)
+            TextButton(
+              onPressed: _startDownload,
+              child: const Text('Retry'),
+            ),
+          if (_downloadedPath != null)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startDownload() async {
+    setState(() {
+      _progress = 0.0;
+      _failed = false;
+    });
+
+    try {
+      final path = await widget.updateService.download(
+        url: widget.info.downloadUrl,
+        onProgress: (received, total) {
+          if (total > 0 && mounted) {
+            setState(() => _progress = received / total);
+          }
+        },
+      );
+      if (!mounted) return;
+      setState(() => _downloadedPath = path);
+      await widget.updateService.install(path);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
   }
 }
 

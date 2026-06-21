@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vpn_client/core/update/update_service.dart';
 import 'package:vpn_client/data/api/api_client.dart';
 import 'package:vpn_client/domain/entities/vpn_config.dart';
 import 'package:vpn_client/domain/entities/warp_config.dart';
@@ -47,13 +48,21 @@ class MockApiClient extends ApiClient {
 
   @override
   Future<WarpConfig?> getWarpConfig() async => null;
+
+  @override
+  Future<Map<String, dynamic>?> checkForUpdate() async => null;
 }
 
-Widget _buildTestApp(ApiClient apiClient, HomeViewModel viewModel) {
+Widget _buildTestApp(
+  ApiClient apiClient,
+  HomeViewModel viewModel, {
+  UpdateService? updateService,
+}) {
   return MaterialApp(
     home: HomeScreen(
       apiClient: apiClient,
       viewModel: viewModel,
+      updateService: updateService ?? UpdateService(apiClient),
     ),
   );
 }

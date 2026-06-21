@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "build_number": 1,
+  "min_version": "1.0.0",
+  "download_url": "https://belirofon-vpn.duckdns.org:8443/api/update/download",
+  "changelog": "- Initial release"
+}
