@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../../data/models/vpn_config.dart';
+import '../entities/vpn_config.dart';
 
 enum VpnConnectionState {
   disconnected,

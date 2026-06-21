@@ -1,18 +1,17 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/api/api_client.dart';
-import '../../data/models/vpn_config.dart';
-import '../../core/vpn/vpn_service.dart';
+import '../../domain/entities/vpn_config.dart';
+import '../viewmodels/home_viewmodel.dart';
 import 'admin_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
-  final VpnService vpnService;
+  final HomeViewModel viewModel;
 
   const HomeScreen({
     super.key,
     required this.apiClient,
-    required this.vpnService,
+    required this.viewModel,
   });
 
   @override
@@ -21,18 +20,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  VpnConnectionState _connectionState = VpnConnectionState.disconnected;
-  VpnConfig? _activeConfig;
-  StreamSubscription<VpnConnectionState>? _stateSub;
-  String? _errorMessage;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    _stateSub = widget.vpnService.state.listen(_onStateChanged);
-
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -40,70 +33,23 @@ class _HomeScreenState extends State<HomeScreen>
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    widget.viewModel.addListener(_onViewModelChanged);
   }
 
   @override
   void dispose() {
-    _stateSub?.cancel();
+    widget.viewModel.removeListener(_onViewModelChanged);
     _pulseController.dispose();
     super.dispose();
   }
 
-  void _onStateChanged(VpnConnectionState state) {
-    if (!mounted) return;
-    setState(() {
-      _connectionState = state;
-      if (state == VpnConnectionState.disconnected) {
-        _activeConfig = null;
-        _errorMessage = null;
-      }
-    });
-
-    if (state == VpnConnectionState.connecting) {
+  void _onViewModelChanged() {
+    if (widget.viewModel.isLoading) {
       _pulseController.repeat(reverse: true);
     } else {
       _pulseController.stop();
       _pulseController.value = 1.0;
     }
-  }
-
-  Future<void> _toggleConnection() async {
-    if (_connectionState == VpnConnectionState.connected) {
-      await widget.vpnService.disconnect();
-      return;
-    }
-
-    setState(() => _errorMessage = null);
-
-    try {
-      final config = await widget.apiClient.getBestConfig();
-      if (!mounted) return;
-
-      if (config == null) {
-        setState(() {
-          _errorMessage = 'Server unavailable.\nCheck that the server is running.';
-        });
-        return;
-      }
-
-      await widget.vpnService.connect(config);
-      if (mounted) setState(() => _activeConfig = config);
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar(e.toString());
-      }
-    }
-  }
-
-  void _showErrorSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
   }
 
   void _showDebugMenu() {
@@ -124,182 +70,276 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isConnected = _connectionState == VpnConnectionState.connected;
-    final isLoading = _connectionState == VpnConnectionState.connecting;
-    final statusColor = switch (_connectionState) {
-      VpnConnectionState.connected => Colors.green,
-      VpnConnectionState.error => theme.colorScheme.error,
-      _ => Colors.grey,
-    };
+    return ListenableBuilder(
+      listenable: widget.viewModel,
+      builder: (context, _) {
+        final vm = widget.viewModel;
+        final theme = Theme.of(context);
+        final statusColor = switch (vm.screenState) {
+          ScreenState.connected => Colors.green,
+          ScreenState.error => theme.colorScheme.error,
+          _ => Colors.grey,
+        };
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('VPN Client'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            tooltip: 'Admin Panel',
-            onPressed: () => _openAdminLogin(),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('VPN Client'),
+            centerTitle: true,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child:               IconButton(
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  tooltip: 'Admin Panel',
+                  onPressed: _openAdminLogin,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(flex: 2),
-                // Animated shield
-                GestureDetector(
-                  onLongPress: _showDebugMenu,
-                  child: AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: isLoading ? _pulseAnimation.value : 1.0,
-                        child: child,
-                      );
-                    },
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: Icon(
-                        isConnected
-                            ? Icons.shield
-                            : Icons.shield_outlined,
-                        key: ValueKey(isConnected),
-                        size: 120,
-                        color: statusColor,
-                      ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  const SizedBox(height: 28),
+                  _ModeSwitch(
+                    selectedMode: vm.selectedMode,
+                    onChanged: vm.selectMode,
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onLongPress: _showDebugMenu,
+                    child: _ShieldWidget(
+                      isLoading: vm.isLoading,
+                      isConnected: vm.isConnected,
+                      statusColor: statusColor,
+                      pulseAnimation: _pulseAnimation,
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                // Status row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _statusLabel(),
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
+                      const SizedBox(width: 8),
+                      Text(
+                        vm.statusLabel,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  if (vm.activeConfig != null)
+                    _ServerInfoCard(config: vm.activeConfig!),
+                  if (vm.errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_rounded,
+                              color: theme.colorScheme.onErrorContainer,
+                              size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              vm.errorMessage!,
+                              style: TextStyle(
+                                color: theme.colorScheme.onErrorContainer,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                // Server info
-                if (_activeConfig != null)
-                  _ServerInfoCard(config: _activeConfig!),
-                // Error message
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning_rounded,
-                            color: theme.colorScheme.onErrorContainer,
-                            size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer,
-                              fontSize: 13,
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: vm.isConnected
+                          ? _DisconnectButton(onPressed: vm.toggleConnection)
+                          : _ConnectButton(
+                              isLoading: vm.isLoading,
+                              onPressed: vm.toggleConnection,
                             ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ],
-                const Spacer(flex: 2),
-                // Action button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton(
-                    onPressed: isLoading ? null : _toggleConnection,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: isConnected
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.primary,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: isLoading
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: theme.colorScheme.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'CONNECTING…',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onPrimary,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            isConnected ? 'DISCONNECT' : 'CONNECT',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
-                const Spacer(flex: 1),
-              ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+// -- Mode Switch --
+
+class _ModeSwitch extends StatelessWidget {
+  final HomeMode selectedMode;
+  final ValueChanged<HomeMode> onChanged;
+
+  const _ModeSwitch({
+    required this.selectedMode,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.8,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _ModeOption(
+            label: 'WARP',
+            icon: Icons.bolt,
+            isSelected: selectedMode == HomeMode.warp,
+            onTap: () => onChanged(HomeMode.warp),
+          )),
+          Expanded(child: _ModeOption(
+            label: 'Proxy',
+            icon: Icons.shield_outlined,
+            isSelected: selectedMode == HomeMode.proxy,
+            onTap: () => onChanged(HomeMode.proxy),
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeOption extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModeOption({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 48,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE8F5E9) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF4CAF50) : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20,
+                color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF616161)),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF616161),
+            )),
+          ],
         ),
       ),
     );
   }
+}
 
-  String _statusLabel() {
-    return switch (_connectionState) {
-      VpnConnectionState.connected => 'Connected',
-      VpnConnectionState.connecting => 'Connecting…',
-      VpnConnectionState.error => 'Error',
-      VpnConnectionState.disconnected => 'Disconnected',
-    };
+// -- Shield Widget --
+
+class _ShieldWidget extends StatelessWidget {
+  final bool isLoading;
+  final bool isConnected;
+  final Color statusColor;
+  final Animation<double> pulseAnimation;
+
+  const _ShieldWidget({
+    required this.isLoading,
+    required this.isConnected,
+    required this.statusColor,
+    required this.pulseAnimation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: isLoading ? pulseAnimation.value : 1.0,
+          child: child,
+        );
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (isConnected) ...[
+            Container(
+              width: 140,
+              height: 140,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x1A4CAF50),
+              ),
+            ),
+            Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x334CAF50),
+              ),
+            ),
+          ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Icon(
+              isConnected ? Icons.shield : Icons.shield_outlined,
+              key: ValueKey(isConnected),
+              size: 96,
+              color: statusColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-// -- Server info card --
+// -- Server Info Card --
 
 class _ServerInfoCard extends StatelessWidget {
   final VpnConfig config;
@@ -308,35 +348,142 @@ class _ServerInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final latencyColor = config.latencyMs < 60
+        ? Colors.green
+        : config.latencyMs < 120
+            ? Colors.orange
+            : Colors.red;
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.dns_outlined, size: 18, color: theme.colorScheme.primary),
+            Icon(Icons.dns_outlined, size: 18, color: Colors.grey.shade600),
             const SizedBox(width: 8),
-            Text(config.name, style: theme.textTheme.bodyLarge),
+            Text(
+              config.name,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
             const SizedBox(width: 4),
             Text(
               '(${config.country})',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
-            const SizedBox(width: 16),
-            Icon(Icons.speed, size: 18, color: theme.colorScheme.primary),
+            const Spacer(),
+            Icon(Icons.speed, size: 18, color: latencyColor),
             const SizedBox(width: 4),
             Text(
               '${config.latencyMs}ms',
-              style: theme.textTheme.bodyLarge?.copyWith(
+              style: TextStyle(
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
+                color: latencyColor,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// -- Connect Button --
+
+class _ConnectButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _ConnectButton({
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FilledButton(
+      onPressed: isLoading ? null : onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: theme.colorScheme.primary,
+        disabledBackgroundColor: Colors.grey.shade300,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      child: isLoading
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'CONNECTING…',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ],
+            )
+          : const Text(
+              'CONNECT',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+    );
+  }
+}
+
+// -- Disconnect Button --
+
+class _DisconnectButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _DisconnectButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE53935), Color(0xFFC62828)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 56,
+            alignment: Alignment.center,
+            child: const Text(
+              'DISCONNECT',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
         ),
       ),
     );
