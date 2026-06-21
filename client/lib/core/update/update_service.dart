@@ -15,14 +15,12 @@ class AppVersionInfo {
   final Version latest;
   final Version minimum;
   final int buildNumber;
-  final String downloadUrl;
   final String changelog;
 
   AppVersionInfo({
     required this.latest,
     required this.minimum,
     required this.buildNumber,
-    required this.downloadUrl,
     required this.changelog,
   });
 
@@ -31,7 +29,6 @@ class AppVersionInfo {
       latest: Version.parse(json['version'] as String? ?? '0.0.0'),
       minimum: Version.parse(json['min_version'] as String? ?? '0.0.0'),
       buildNumber: json['build_number'] as int? ?? 1,
-      downloadUrl: json['download_url'] as String? ?? '',
       changelog: json['changelog'] as String? ?? '',
     );
   }
@@ -51,7 +48,14 @@ class UpdateService {
   final Dio _dio;
   static const _channel = MethodChannel('vpn_client/install');
 
-  UpdateService(this._apiClient) : _dio = Dio();
+  UpdateService(this._apiClient)
+      : _dio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 120),
+            sendTimeout: const Duration(seconds: 15),
+          ),
+        );
 
   /// Fetches version info from server and decides update status.
   Future<UpdateCheckResult?> check() async {
@@ -74,13 +78,14 @@ class UpdateService {
     return UpdateCheckResult(status: status, info: info);
   }
 
-  /// Downloads APK to local storage. Returns file path on success.
+  /// Downloads APK from the same server the client is configured to use.
+  /// Returns the local file path on success.
   Future<String> download({
-    required String url,
     void Function(int received, int total)? onProgress,
   }) async {
     final dir = await getApplicationDocumentsDirectory();
     final filePath = '${dir.path}/vpn-client-android.apk';
+    final url = '${_apiClient.serverUrl ?? 'http://localhost:8080'}/api/update/download';
 
     await _dio.download(
       url,

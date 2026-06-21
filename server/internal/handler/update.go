@@ -15,7 +15,6 @@ type UpdateInfo struct {
 	Version     string `json:"version"`
 	BuildNumber int    `json:"build_number"`
 	MinVersion  string `json:"min_version"`
-	DownloadURL string `json:"download_url"`
 	Changelog   string `json:"changelog"`
 }
 

@@ -2,6 +2,5 @@
   "version": "1.0.7",
   "build_number": 7,
   "min_version": "1.0.0",
-  "download_url": "https://belirofon-vpn.duckdns.org:8443/api/update/download",
   "changelog": "- WARP Cloudflare integration\n- Tab-based config selection (WARP/Proxy)\n- In-app auto-updates (hard + soft)\n- Admin panel\n- REALITY filter"
 }

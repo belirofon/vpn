@@ -113,7 +113,6 @@ jobs:
               "version": "${{ steps.version.outputs.version }}",
               "build_number": ${{ steps.version.outputs.build_number }},
               "min_version": "${MIN_VER}",
-              "download_url": "https://${{ vars.DOMAIN }}:8443/api/update/download",
               "changelog": "${{ github.event.release.body || 'See release notes on GitHub' }}"
             }
             VERSION_EOF

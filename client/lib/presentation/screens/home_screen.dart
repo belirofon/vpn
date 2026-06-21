@@ -942,7 +942,6 @@ class _UpdateDialogState extends State<_UpdateDialog> {
 
     try {
       final path = await widget.updateService.download(
-        url: widget.info.downloadUrl,
         onProgress: (received, total) {
           if (total > 0 && mounted) {
             setState(() => _progress = received / total);
@@ -952,7 +951,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       if (!mounted) return;
       setState(() => _downloadedPath = path);
       await widget.updateService.install(path);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Update download failed: $e');
       if (mounted) setState(() => _failed = true);
     }
   }
