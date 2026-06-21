@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/api/api_client.dart';
 import '../../domain/entities/vpn_config.dart';
+import '../../domain/entities/warp_config.dart';
 import '../viewmodels/home_viewmodel.dart';
 import 'admin_login_screen.dart';
 
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     widget.viewModel.addListener(_onViewModelChanged);
+    widget.viewModel.loadConfigs();
   }
 
   @override
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen>
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child:               IconButton(
+                child: IconButton(
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   tooltip: 'Admin Panel',
                   onPressed: _openAdminLogin,
@@ -106,89 +108,439 @@ class _HomeScreenState extends State<HomeScreen>
                     selectedMode: vm.selectedMode,
                     onChanged: vm.selectMode,
                   ),
-                  const Spacer(),
-                  GestureDetector(
-                    onLongPress: _showDebugMenu,
-                    child: _ShieldWidget(
-                      isLoading: vm.isLoading,
-                      isConnected: vm.isConnected,
-                      statusColor: statusColor,
-                      pulseAnimation: _pulseAnimation,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
-                        ),
+                  const SizedBox(height: 16),
+                  if (vm.isConnected)
+                    Expanded(
+                      child: _ConnectedBody(
+                        vm: vm,
+                        statusColor: statusColor,
+                        pulseAnimation: _pulseAnimation,
+                        onDebugTap: _showDebugMenu,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        vm.statusLabel,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  if (vm.activeConfig != null)
-                    _ServerInfoCard(config: vm.activeConfig!),
-                  if (vm.errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_rounded,
-                              color: theme.colorScheme.onErrorContainer,
-                              size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              vm.errorMessage!,
-                              style: TextStyle(
-                                color: theme.colorScheme.onErrorContainer,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
+                    )
+                  else
+                    Expanded(
+                      child: _ConfigList(
+                        mode: vm.selectedMode,
+                        proxyConfigs: vm.proxyConfigs,
+                        warpConfig: vm.warpConfig,
+                        isLoading: vm.isLoadingConfigs,
+                        onProxyTap: vm.connectToProxy,
                       ),
                     ),
-                  ],
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: vm.isConnected
-                          ? _DisconnectButton(onPressed: vm.toggleConnection)
-                          : _ConnectButton(
-                              isLoading: vm.isLoading,
-                              onPressed: vm.toggleConnection,
-                            ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// -- Connected body (shield + info + disconnect) --
+
+class _ConnectedBody extends StatelessWidget {
+  final HomeViewModel vm;
+  final Color statusColor;
+  final Animation<double> pulseAnimation;
+  final VoidCallback onDebugTap;
+
+  const _ConnectedBody({
+    required this.vm,
+    required this.statusColor,
+    required this.pulseAnimation,
+    required this.onDebugTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onLongPress: onDebugTap,
+          child: _ShieldWidget(
+            isLoading: vm.isLoading,
+            isConnected: vm.isConnected,
+            statusColor: statusColor,
+            pulseAnimation: pulseAnimation,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: statusColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              vm.statusLabel,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: statusColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        if (vm.activeConfig != null)
+          _ServerInfoCard(config: vm.activeConfig!),
+        if (vm.errorMessage != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_rounded,
+                    color: theme.colorScheme.onErrorContainer, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    vm.errorMessage!,
+                    style: TextStyle(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 32),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: _DisconnectButton(onPressed: vm.toggleConnection),
+        ),
+      ],
+    );
+  }
+}
+
+// -- Config list --
+
+class _ConfigList extends StatelessWidget {
+  final HomeMode mode;
+  final List<VpnConfig> proxyConfigs;
+  final WarpConfig? warpConfig;
+  final bool isLoading;
+  final void Function(VpnConfig) onProxyTap;
+
+  const _ConfigList({
+    required this.mode,
+    required this.proxyConfigs,
+    required this.warpConfig,
+    required this.isLoading,
+    required this.onProxyTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (mode == HomeMode.proxy) {
+      if (proxyConfigs.isEmpty) {
+        return Center(
+          child: Text(
+            'No proxy configs available',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+          ),
+        );
+      }
+
+      return ListView.separated(
+        itemCount: proxyConfigs.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final config = proxyConfigs[index];
+          return _ProxyConfigTile(
+            config: config,
+            onTap: () => onProxyTap(config),
+          );
+        },
+      );
+    }
+
+    // WARP mode
+    if (warpConfig == null) {
+      return Center(
+        child: Text(
+          'WARP config not available',
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+        ),
+      );
+    }
+
+    return Center(
+      child: _WarpConfigCard(config: warpConfig!),
+    );
+  }
+}
+
+// -- Proxy config tile --
+
+class _ProxyConfigTile extends StatelessWidget {
+  final VpnConfig config;
+  final VoidCallback onTap;
+
+  const _ProxyConfigTile({
+    required this.config,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final latencyColor = config.latencyMs < 60
+        ? Colors.green
+        : config.latencyMs < 120
+            ? Colors.orange
+            : Colors.red;
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    config.country.isNotEmpty
+                        ? config.country.toUpperCase()
+                        : '🌐',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      config.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${config.protocol.toUpperCase()} · ${config.server}:${config.port}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.speed, size: 16, color: latencyColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${config.latencyMs}ms',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: latencyColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Icon(
+                    Icons.play_circle_fill,
+                    size: 22,
+                    color: Colors.green.shade400,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// -- WARP config card --
+
+class _WarpConfigCard extends StatelessWidget {
+  final WarpConfig config;
+
+  const _WarpConfigCard({required this.config});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final latencyColor = config.latencyMs < 60
+        ? Colors.green
+        : config.latencyMs < 120
+            ? Colors.orange
+            : Colors.red;
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.cyan.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.bolt, color: Colors.cyan, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cloudflare WARP',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        config.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(Icons.speed, size: 16, color: latencyColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${config.latencyMs}ms',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: latencyColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _infoRow('Endpoint', config.endpoint),
+            _infoRow('Protocol', config.protocol.toUpperCase()),
+            if (config.clientId != null && config.clientId!.isNotEmpty)
+              _infoRow('Client ID', config.clientId!),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'WARP connection not yet supported on mobile',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.bolt, size: 18),
+                label: const Text('Connect WARP'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.cyan.shade700,
+                  side: BorderSide(color: Colors.cyan.shade200),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -387,63 +739,6 @@ class _ServerInfoCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// -- Connect Button --
-
-class _ConnectButton extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  const _ConnectButton({
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return FilledButton(
-      onPressed: isLoading ? null : onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: theme.colorScheme.primary,
-        disabledBackgroundColor: Colors.grey.shade300,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      child: isLoading
-          ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'CONNECTING…',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                ),
-              ],
-            )
-          : const Text(
-              'CONNECT',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
     );
   }
 }

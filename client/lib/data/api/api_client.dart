@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/vpn_config.dart';
+import '../../domain/entities/warp_config.dart';
 import '../../domain/repositories/http_client.dart';
 import '../datasources/dio_http_client.dart';
 import '../dto/vpn_config_dto.dart';
@@ -76,6 +77,20 @@ class ApiClient {
     } catch (e) {
       debugPrint('ApiClient.getConfigs error: $e');
       return [];
+    }
+  }
+
+  Future<WarpConfig?> getWarpConfig() async {
+    try {
+      final response = await _http.get('/api/warp-config');
+      if (response.statusCode == 200 && response.data?['config'] != null) {
+        return WarpConfig.fromJson(
+            response.data!['config'] as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.getWarpConfig error: $e');
+      return null;
     }
   }
 
