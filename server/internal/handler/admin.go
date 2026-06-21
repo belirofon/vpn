@@ -19,7 +19,7 @@ var (
 
 func generateToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
@@ -89,12 +89,12 @@ func SetupAdminRoutes(r *gin.Engine, cc *cache.ConfigCache) {
 			uptime := time.Since(cc.GetStartedAt()).Truncate(time.Second).String()
 
 			c.JSON(http.StatusOK, gin.H{
-				"status":            status,
-				"message":           msg,
-				"configs_tested":    len(configs),
-				"uptime":            uptime,
-				"subscription_url":  currentCfg.SubscriptionURL,
-				"refresh_interval":  currentCfg.RefreshInterval.String(),
+				"status":           status,
+				"message":          msg,
+				"configs_tested":   len(configs),
+				"uptime":           uptime,
+				"subscription_url": currentCfg.SubscriptionURL,
+				"refresh_interval": currentCfg.RefreshInterval.String(),
 			})
 		})
 
