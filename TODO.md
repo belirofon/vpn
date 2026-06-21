@@ -1,11 +1,11 @@
 # План работ
 
-> Основан на анализе проекта от 2026-06-19
+> Обновлено: 2026-06-21
 > Статусы: ⬜ Pending · 🔄 In Progress · ✅ Done · ❌ Cancelled
 
 ---
 
-## ✅ Фаза 0 — Безопасность (Critical) — ВЫПОЛНЕНО
+## ✅ Фаза 0 — Безопасность — ВЫПОЛНЕНО
 
 - [x] **SCRUB: Удалить credentials из PLAN.md** — IP, порт SSH, username сервера
 - [x] **CONFIG: Вынести `InsecureSkipVerify` в настройки** — добавлен флаг `SKIP_VERIFY_TLS` (default: true)
@@ -15,59 +15,53 @@
 
 ## ✅ Фаза 0.5 — Убрать хардкод домена — ВЫПОЛНЕНО
 
-- [x] **Flutter client** — `_defaultWebUrl` больше не содержит `belirofon-vpn.duckdns.org`, только localhost
-- [x] **Caddyfile** — домен читается из `{$DOMAIN}` (env)
-- [x] **docker-compose** — Caddy получает `DOMAIN`, DuckDNS парсит subdomain
-- [x] **build-android.yml** — `SERVER_URL` через `vars.SERVER_URL`
-- [x] **deploy.yml** — `DOMAIN` через `vars.DOMAIN`
-- [x] **Makefile** — `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `DOMAIN` больше не захордкожены
+- [x] **Flutter client** — URL только localhost по умолчанию
+- [x] **Caddyfile** — домен через `{$DOMAIN}` (env)
+- [x] **docker-compose** — Caddy + DuckDNS через env
+- [x] **build-android.yml / deploy.yml / Makefile** — всё через vars/env
 
 ---
 
-## ⬜ Фаза 1 — Тесты (High Priority)
+## ✅ Фаза 1 — Тесты — ВЫПОЛНЕНО
 
-Самый критичный пробел проекта. Без тестов нет уверенности в рефакторинге и новых фичах.
-
-### Go unit-тесты (минимум)
-- [ ] **parser** — `TEST(ParseConfigLink)` для vless, vmess, trojan, ss; `TEST(ParseSubscription)` для base64/JSON/plain
-- [ ] **resolver** — `TEST(ResolveIP)` с мок-резолвером
-- [ ] **geo** — `TEST(FilterNonRussia)` с мок-GeoDB
-- [ ] **config** — `TEST(ParseDotEnv)` с разными форматами строк
-- [ ] **tester** — `TEST(ParseUUID)` для корректности 16-байтного UUID
-
-### Go integration
-- [ ] **Добавить `golangci-lint` в CI** — перед deploy workflow
-- [ ] **Добавить `go test` в CI** — `go test ./internal/...`
+### Go unit-тесты
+- [x] **parser** — 24 теста: парсинг VLESS/VMess/Trojan/SS, subscription (base64/JSON/plain), порты, id, raw_link
+- [x] **resolver** — тесты с мок-резолвером
+- [x] **geo** — 6 тестов: nil GeoDB, пустые конфиги, invalid path, nil receiver, invalid IP, non-RU filter
+- [x] **config** — 11 тестов: parseDotEnv (normal, quoted, comments, whitespace, no-override, malformed, empty key), LoadConfig (defaults, env vars)
+- [x] **tester** — 6 тестов: ParseUUID (valid, zeros, Fs, invalid length, random), Unhex
+- [x] **pipeline** — 6 тестов: mock configs (non-RU, sorted, fastest DE), Run(), NoSubscriptionURL, filterReality
 
 ### Dart тесты
-- [ ] **VpnConfig** — `TEST(fromJson)`, `TEST(toJson)`, `TEST(fromRawLink)`
-- [ ] **ApiClient** — unit-тесты с мок-ответами (mockito/mocktail)
-- [ ] **WidgetTest** — `TEST(HomeScreen)` — проверка отображения состояний
+- [x] **VpnConfig** — 12+ тестов: fromJson, toJson, fromRawLink
+- [x] **WidgetTest** — тесты отображения состояний HomeScreen
+
+### Остаётся
+- [ ] **Добавить `golangci-lint` в CI** — перед deploy workflow
 - [ ] **Добавить `flutter analyze` в CI**
+- [ ] **ApiClient** — unit-тесты с мок-ответами (mockito/mocktail)
 
 ---
 
 ## ⬜ Фаза 2 — Архитектура
 
-### Сервер (Go)
-- [ ] **Рефакторинг `cache.refresh()`** — выделить пайплайн:
+### Сервер (Go) — в основном выполнено
+- [x] **Рефакторинг `cache.refresh()`** — выделен модуль `internal/pipeline/pipeline.go`
   - `fetcher.Fetch()` → `parser.ParseAll()` → `tester.TestAll()` → `geo.Filter()` → `reality.Filter()` → `sort.ByLatency()`
-  - Каждый шаг — отдельный публичный метод
-- [ ] **Вынести сортировку** — общий `sort.SortByLatency()` для `refresh()` и `loadMockConfigs()`
-- [ ] **Вынести REALITY filter** — отдельный пакет `internal/filter/reality.go`
-- [ ] **Добавить `net.Resolver` с DoH** — опциональный DNS-over-HTTPS для резолва
+- [x] **Вынести REALITY filter** — в `pipeline.filterReality()`
+- [x] **`parseDotEnv` поддержка `\r\n`** — добавлена нормализация
+- [x] **Сортировка в loadMockConfigs** — локальная, без дублирования
+- [ ] **Добавить `net.Resolver` с DoH** — опциональный DNS-over-HTTPS
 - [ ] **Обновить/удалить устаревший `docker-compose.prod.yml`**
 
 ### Клиент (Flutter/Dart)
-- [ ] **Решить судьбу `domain/`**:
-  - Вариант A: удалить пустую директорию
-  - Вариант B: имплементировать `GetBestConfigUseCase`, `ConnectToVpnUseCase`
+- [x] **Пустая `domain/`** — удалена (директории больше нет)
 - [ ] **Выделить persistence из ApiClient**:
   - Создать `StorageService` (обёртка над `SharedPreferences`)
   - ApiClient принимает `StorageService` или URL через конструктор
-- [ ] **Добавить `initialize()` в интерфейс `VpnService`** — или сделать статический factory `VpnService.create()`
+- [ ] **Добавить `initialize()` в интерфейс `VpnService`** — или статический factory
 - [ ] **Заменить `hashCode.toString()` на стабильный id** — `server:port`
-- [ ] **Добавить `Result<VpnConfig>` или sealed class для ответов ApiClient** — сохранить контекст ошибки
+- [ ] **Добавить `Result<VpnConfig>` или sealed class для ответов ApiClient**
 
 ---
 
@@ -79,58 +73,53 @@
 - [ ] Вынести строки UI в константы/локализацию
 
 ### Остальное
-- [ ] **Исправить `parseDotEnv(\r\n)`** — добавить поддержку Windows line endings
 - [ ] **Добавить exponential backoff** в `fetcher.go` (1s → 2s → 4s)
-- [ ] **Добавить `mounted` check в `web_vpn_service.dart`** — sync с mobile версией
-- [ ] **Убрать мутацию `cfg.Country`** внутри `geo.FilterNonRussia()` — возвращать отдельную структуру с результатом
+- [ ] **Добавить `mounted` check в `web_vpn_service.dart`**
+- [ ] **Убрать мутацию `cfg.Country`** внутри `geo.FilterNonRussia()`
 - [ ] **Обновить go.mod** — подтянуть актуальные версии зависимостей
 - [ ] **Добавить pre-commit hooks** — `.githooks/pre-commit` с `go fmt` и `dart format`
 
 ---
 
-## ⬜ Фаза 4 — Нереализованные фичи (из PLAN.md Roadmap)
+## ⬜ Фаза 4 — Новые фичи
 
-- [ ] **Выбор конкретного сервера из списка** — продвинутый режим, показать все конфиги и дать выбрать вручную
-- [ ] **Поддержка REALITY в Flutter клиенте** — требует uTLS/Xray core (Go 1.24+)
+- [ ] **Выбор конкретного сервера из списка** — продвинутый режим
+- [ ] **Поддержка REALITY в Flutter клиенте** — uTLS/Xray core
 - [ ] **История подключений** — логи соединений, статистика
-- [ ] **Push-уведомления о статусе сервера** — через Firebase Cloud Messaging
-- [ ] **Тёмная тема** — `ThemeMode.dark` по расписанию или системной настройке
-- [ ] **Авто-подключение при запуске** — флаг `auto_connect` в настройках
-- [ ] **WireGuard protocol support** — добавить парсинг и тестирование WireGuard конфигов
+- [ ] **Push-уведомления о статусе сервера** — Firebase Cloud Messaging
+- [ ] **Тёмная тема** — `ThemeMode.dark`
+- [ ] **Авто-подключение при запуске**
+- [ ] **WireGuard protocol support**
+- [ ] **Multi-user support** — per-user config cache
 
 ---
 
 ## Приоритет выполнения
 
 ```
-1. ✅ Фаза 0 — Безопасность              (выполнено)
-2. ✅ Фаза 0.5 — Убрать хардкод домена    (выполнено)
-3. 🔴 Фаза 1 — Тесты                      (следующий шаг)
-4. 🟡 Фаза 2 — Архитектура                (после тестов)
-5. 🟡 Фаза 3 — Code Quality               (параллельно с Фазой 2)
-6. 🟢 Фаза 4 — Новые фичи                 (после стабилизации)
+1. ✅ Фаза 0 — Безопасность
+2. ✅ Фаза 0.5 — Убрать хардкод домена
+3. ✅ Фаза 1 — Тесты (основные написаны)
+4. ⬜ Линтеры в CI + Go и Dart тесты в CI
+5. ⬜ Фаза 2 — Архитектура (клиент)
+6. ⬜ Фаза 3 — Code Quality
+7. ⬜ Фаза 4 — Новые фичи
 ```
 
-### Быстрые победы (1-2 часа) — сделано ✅
-- ~~SCRUB credentials из PLAN.md~~ ✅
-- ~~README `/health` status fix~~ ✅
-- ~~Убрать хардкод домена~~ ✅
-- ~~CORS конфигурация~~ ✅
+### Быстрые победы (1-2 часа)
 - `link.hashCode` → `server:port`
-- `parseDotEnv` Windows `\r\n`
-- Удалить пустую `domain/`
 - `docker-compose.prod.yml` cleanup
+- `mounted` check в `web_vpn_service.dart`
 
 ### Средний приоритет (2-8 часов)
-- Unit-тесты parser, resolver, geo
 - `golangci-lint` + `flutter analyze` в CI
 - Разделение home_screen.dart
-- REALITY filter вынести из cache.refresh()
 - Exponential backoff в fetcher
+- ApiClient unit-тесты
 
 ### Большие работы (8+ часов)
-- Рефакторинг `cache.refresh()` в pipeline
 - Persistence из ApiClient → StorageService
 - `initialize()` рефакторинг VpnService
-- WireGuard protocol
 - Выбор сервера из списка (UI + API)
+- WireGuard protocol
+- REALITY поддержка в Flutter

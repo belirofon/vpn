@@ -33,3 +33,6 @@ PLAN.md
 .vscode/
 *.swp
 *.swo
+
+# Understand plugin
+.understand-anything

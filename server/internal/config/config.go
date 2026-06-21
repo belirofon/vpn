@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,23 +20,27 @@ func LoadDotEnv() {
 		return
 	}
 
-	// Walk up looking for .env
 	for {
 		path := filepath.Join(dir, ".env")
 		if data, err := os.ReadFile(path); err == nil {
 			n := parseDotEnv(string(data))
-			log.Printf("INFO: loaded .env from %s (%d vars)", path, n)
+			slog.Info("loaded .env", "path", path, "vars", n)
 			return
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			break // hit root
+			break
 		}
 		dir = parent
 	}
 }
 
+// parseDotEnv parses key=value pairs from .env content.
+// Supports \n and \r\n line endings, quoted values, and comments.
 func parseDotEnv(content string) int {
+	// Normalize \r\n to \n for Windows compatibility.
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+
 	count := 0
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)

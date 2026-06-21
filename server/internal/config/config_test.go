@@ -108,6 +108,26 @@ KEY=val`
 	}
 }
 
+func TestParseDotEnv_WindowsLineEndings(t *testing.T) {
+	content := "KEY=value\r\nANOTHER=val\r\n# comment\r\n\r\nTHIRD=test\r\n"
+
+	os.Clearenv()
+	n := parseDotEnv(content)
+
+	if n != 3 {
+		t.Errorf("expected 3 vars parsed with \\r\\n, got %d", n)
+	}
+	if os.Getenv("KEY") != "value" {
+		t.Errorf("KEY = %q, want %q", os.Getenv("KEY"), "value")
+	}
+	if os.Getenv("ANOTHER") != "val" {
+		t.Errorf("ANOTHER = %q, want %q", os.Getenv("ANOTHER"), "val")
+	}
+	if os.Getenv("THIRD") != "test" {
+		t.Errorf("THIRD = %q, want %q", os.Getenv("THIRD"), "test")
+	}
+}
+
 func TestParseDotEnv_EmptyKey(t *testing.T) {
 	content := `=value
 KEY=val`
