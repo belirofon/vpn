@@ -47,9 +47,17 @@ jobs:
             # Create .env from secret if missing
             if [ ! -f .env ]; then
               printf '%s\n' "$ENV_FILE" > .env
+              echo "=== .env created from secret ==="
+            fi
+
+            if ! grep -q "^DUCK_DNS_TOKEN=" .env; then
               echo "DUCK_DNS_TOKEN=$DUCK_DNS_TOKEN" >> .env
+              echo "=== DUCK_DNS_TOKEN appended ==="
+            fi
+
+            if ! grep -q "^DOMAIN=" .env; then
               echo "DOMAIN=$DOMAIN" >> .env
-              echo "=== .env created ==="
+              echo "=== DOMAIN appended ==="
             fi
 
             # Extract subdomain for DuckDNS (strip .duckdns.org suffix)
