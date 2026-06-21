@@ -76,6 +76,7 @@ type Config struct {
 	CORSOrigins     string // CORS_ORIGINS — allowed CORS origins (default: *)
 	AdminEmail      string // ADMIN_EMAIL — admin login email
 	AdminPassword   string // ADMIN_PASSWORD — admin login password
+	WarpEnabled     bool   // WARP_ENABLED — enable WARP Cloudflare config generation
 }
 
 func LoadConfig() Config {
@@ -90,6 +91,7 @@ func LoadConfig() Config {
 		CORSOrigins:     getEnv("CORS_ORIGINS", "*"),
 		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
+		WarpEnabled:     os.Getenv("WARP_ENABLED") == "true",
 	}
 	return cfg
 }
