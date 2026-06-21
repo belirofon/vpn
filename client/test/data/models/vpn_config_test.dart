@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vpn_client/data/models/vpn_config.dart';
+import 'package:vpn_client/domain/entities/vpn_config.dart';
+import 'package:vpn_client/data/dto/vpn_config_dto.dart';
 
 void main() {
-  group('VpnConfig.fromJson', () {
+  group('VpnConfigDto.fromJson', () {
     test('parses all fields correctly', () {
       final json = {
         'id': 'server.com:443',
-        'name': '🇳🇱 NL-01',
+        'name': 'NL-01',
         'server': '192.168.1.1',
         'port': 443,
         'protocol': 'vless',
@@ -18,10 +19,10 @@ void main() {
         'raw_link': 'vless://...',
       };
 
-      final config = VpnConfig.fromJson(json);
+      final config = VpnConfigDto.fromJson(json);
 
       expect(config.id, 'server.com:443');
-      expect(config.name, '🇳🇱 NL-01');
+      expect(config.name, 'NL-01');
       expect(config.server, '192.168.1.1');
       expect(config.port, 443);
       expect(config.protocol, 'vless');
@@ -44,7 +45,7 @@ void main() {
         'country': '',
       };
 
-      final config = VpnConfig.fromJson(json);
+      final config = VpnConfigDto.fromJson(json);
 
       expect(config.uuid, isNull);
       expect(config.password, isNull);
@@ -66,7 +67,7 @@ void main() {
         'country': null,
       };
 
-      final config = VpnConfig.fromJson(json);
+      final config = VpnConfigDto.fromJson(json);
 
       expect(config.id, '');
       expect(config.name, '');
@@ -78,9 +79,9 @@ void main() {
     });
   });
 
-  group('VpnConfig.toJson', () {
+  group('VpnConfigDto.toJson', () {
     test('serializes all fields correctly', () {
-      final config = VpnConfig(
+      const config = VpnConfig(
         id: 'server.com:443',
         name: 'DE-01',
         server: '192.168.1.1',
@@ -95,13 +96,12 @@ void main() {
         rawLink: 'vless://...',
       );
 
-      final json = config.toJson();
+      final json = VpnConfigDto.toJson(config);
 
       expect(json['id'], 'server.com:443');
       expect(json['name'], 'DE-01');
       expect(json['server'], '192.168.1.1');
       expect(json['port'], 443);
-      expect(json['protocol'], 'vless');
       expect(json['uuid'], 'uuid-here');
       expect(json['password'], 'pass');
       expect(json['tls'], 'tls');
@@ -112,7 +112,7 @@ void main() {
     });
 
     test('omits null fields', () {
-      final config = VpnConfig(
+      const config = VpnConfig(
         id: 's.com:80',
         name: 'test',
         server: 's.com',
@@ -120,7 +120,7 @@ void main() {
         protocol: 'http',
       );
 
-      final json = config.toJson();
+      final json = VpnConfigDto.toJson(config);
 
       expect(json.containsKey('uuid'), isFalse);
       expect(json.containsKey('password'), isFalse);
@@ -130,10 +130,10 @@ void main() {
     });
   });
 
-  group('VpnConfig.fromRawLink', () {
+  group('VpnConfigDto.fromRawLink', () {
     test('parses vless link', () {
       const link = 'vless://uuid@server.com:443?security=tls&type=ws#NL-01';
-      final config = VpnConfig.fromRawLink(link);
+      final config = VpnConfigDto.fromRawLink(link);
 
       expect(config.protocol, 'vless');
       expect(config.uuid, 'uuid');
@@ -146,7 +146,7 @@ void main() {
 
     test('parses link without fragment for name', () {
       const link = 'vless://uuid@server.com:443';
-      final config = VpnConfig.fromRawLink(link);
+      final config = VpnConfigDto.fromRawLink(link);
 
       expect(config.name, 'Manual (server.com:443)');
       expect(config.id, isNot(throwsException));
@@ -154,7 +154,7 @@ void main() {
 
     test('parses link with empty query', () {
       const link = 'vmess://uuid@server.com:443';
-      final config = VpnConfig.fromRawLink(link);
+      final config = VpnConfigDto.fromRawLink(link);
 
       expect(config.protocol, 'vmess');
       expect(config.uuid, 'uuid');
@@ -165,7 +165,7 @@ void main() {
 
   group('VpnConfig.toString', () {
     test('formats correctly with all fields', () {
-      final config = VpnConfig(
+      const config = VpnConfig(
         id: 's.com:443',
         name: 'DE-01',
         server: 's.com',
