@@ -22,7 +22,7 @@ func testVlessProxy(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration, 
 
 	switch cfg.TLS {
 	case "tls":
-		tc := tls.Client(conn, &tls.Config{
+		tc := tls.Client(conn, &tls.Config{ //nolint:gosec
 			ServerName:         cfg.Server,
 			InsecureSkipVerify: skipVerifyTLS,
 		})
@@ -36,7 +36,7 @@ func testVlessProxy(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration, 
 
 	// For WebSocket transport: do WS upgrade, then send VLESS via WS frames
 	if cfg.Network == "ws" || cfg.Network == "websocket" {
-		return testVlessOverWS(tlsConn, cfg, timeout)
+		return testVlessOverWS(tlsConn, cfg)
 	}
 
 	// For TCP/other transports: send VLESS request directly
@@ -44,7 +44,7 @@ func testVlessProxy(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration, 
 }
 
 // testVlessOverWS does WS upgrade then sends VLESS request through WebSocket frames.
-func testVlessOverWS(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration) bool {
+func testVlessOverWS(conn net.Conn, cfg *model.VpnConfig) bool {
 	host := cfg.Host
 	if host == "" {
 		host = cfg.Server
@@ -75,7 +75,7 @@ func testVlessOverWS(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration)
 	}
 
 	// Send HTTP GET as WS binary frame
-	httpReq := buildHttpTestRequest()
+	httpReq := buildHTTPTestRequest()
 	if err := writeWSFrame(conn, httpReq); err != nil {
 		return false
 	}
@@ -95,7 +95,7 @@ func testVlessDirect(conn net.Conn, cfg *model.VpnConfig) bool {
 		return false
 	}
 
-	httpReq := buildHttpTestRequest()
+	httpReq := buildHTTPTestRequest()
 	if _, err := conn.Write(httpReq); err != nil {
 		return false
 	}
@@ -120,13 +120,13 @@ func sendVlessRequest(conn net.Conn, cfg *model.VpnConfig) bool {
 
 	domain := testTargetDomain
 	req := make([]byte, 0, 1+16+1+1+1+len(domain)+2)
-	req = append(req, 0x00)                        // version
-	req = append(req, uuid...)                      // UUID (16 bytes)
-	req = append(req, 0x01)                         // command: TCP
-	req = append(req, 0x03)                         // address type: domain
-	req = append(req, byte(len(domain)))            // domain length
-	req = append(req, []byte(domain)...)             // domain
-	req = append(req, 0x00, byte(testTargetPort))   // port
+	req = append(req, 0x00)                       // version
+	req = append(req, uuid...)                    // UUID (16 bytes)
+	req = append(req, 0x01)                       // command: TCP
+	req = append(req, 0x03)                       // address type: domain
+	req = append(req, byte(len(domain)))          // domain length
+	req = append(req, []byte(domain)...)          // domain
+	req = append(req, 0x00, byte(testTargetPort)) // port
 
 	if _, err := conn.Write(req); err != nil {
 		return false
@@ -134,9 +134,9 @@ func sendVlessRequest(conn net.Conn, cfg *model.VpnConfig) bool {
 	return true
 }
 
-// buildHttpTestRequest returns an HTTP/1.1 GET request for the test target.
+// buildHTTPTestRequest returns an HTTP/1.1 GET request for the test target.
 // Uses /generate_204 path matching v2rayN's approach (returns 204 No Content).
-func buildHttpTestRequest() []byte {
+func buildHTTPTestRequest() []byte {
 	return []byte("GET /generate_204 HTTP/1.1\r\n" +
 		"Host: " + testTargetDomain + "\r\n" +
 		"Connection: close\r\n\r\n")
@@ -190,7 +190,6 @@ func readWSFrame(conn net.Conn) ([]byte, error) {
 	}
 
 	length := int64(header[1] & 0x7F)
-	offset := 2
 
 	switch {
 	case length == 126:
@@ -199,7 +198,6 @@ func readWSFrame(conn net.Conn) ([]byte, error) {
 			return nil, err
 		}
 		length = int64(ext[0])<<8 | int64(ext[1])
-		offset += 2
 	case length == 127:
 		ext := make([]byte, 8)
 		if _, err := io.ReadFull(conn, ext); err != nil {
@@ -209,7 +207,6 @@ func readWSFrame(conn net.Conn) ([]byte, error) {
 		for i := 0; i < 8; i++ {
 			length = length<<8 | int64(ext[i])
 		}
-		offset += 8
 	}
 
 	if length < 0 || length > 65536 {

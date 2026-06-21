@@ -134,7 +134,7 @@ func parseVless(cfg *model.VpnConfig, u *url.URL) {
 	}
 }
 
-func parseVmess(cfg *model.VpnConfig, raw string, u *url.URL) {
+func parseVmess(cfg *model.VpnConfig, raw string, _ *url.URL) {
 	// vmess://base64encodedjson
 	encoded := strings.TrimPrefix(raw, "vmess://")
 	decoded, err := base64.StdEncoding.DecodeString(encoded)

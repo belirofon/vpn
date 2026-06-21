@@ -83,7 +83,7 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 		return pingResult{OK: false}
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(timeout))
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 
 	switch {
 	// VLESS: full proxy test through a domain-based target (tests DNS + protocol + forwarding)
@@ -95,7 +95,7 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	// Trojan: simple password-authenticated proxy test
 	case cfg.Protocol == "trojan":
 		if cfg.TLS == "tls" {
-			tlsConn := tls.Client(conn, &tls.Config{
+			tlsConn := tls.Client(conn, &tls.Config{ //nolint:gosec
 				ServerName:         cfg.Server,
 				InsecureSkipVerify: skipVerifyTLS,
 			})
@@ -111,7 +111,7 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	// VMESS / SS / other: TCP + TLS + WS check (protocol-level test not implemented)
 	default:
 		if cfg.TLS == "tls" {
-			tlsConn := tls.Client(conn, &tls.Config{
+			tlsConn := tls.Client(conn, &tls.Config{ //nolint:gosec
 				ServerName:         cfg.Server,
 				InsecureSkipVerify: skipVerifyTLS,
 			})
@@ -129,7 +129,7 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	}
 
 	latency := time.Since(start).Milliseconds()
-	conn.SetDeadline(time.Time{})
+	_ = conn.SetDeadline(time.Time{})
 	return pingResult{
 		IP:        ip,
 		LatencyMs: latency,
@@ -172,7 +172,7 @@ func testWsUpgrade(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration) b
 		path = "/" + path
 	}
 
-	conn.SetDeadline(time.Now().Add(timeout))
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 
 	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
 		path, host)

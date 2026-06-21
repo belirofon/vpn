@@ -25,7 +25,7 @@ const fetchTimeout = 30 * time.Second
 // Pipeline orchestrates the full config refresh lifecycle.
 type Pipeline struct {
 	cfg    config.Config
-	geoDB  *geo.GeoDB
+	geoDB  *geo.DB
 	logger *slog.Logger
 }
 
@@ -35,7 +35,7 @@ func (p *Pipeline) Cfg() config.Config {
 }
 
 // New creates a new Pipeline. If logger is nil, slog.Default() is used.
-func New(cfg config.Config, geoDB *geo.GeoDB, logger *slog.Logger) *Pipeline {
+func New(cfg config.Config, geoDB *geo.DB, logger *slog.Logger) *Pipeline {
 	if logger == nil {
 		logger = slog.Default()
 	}

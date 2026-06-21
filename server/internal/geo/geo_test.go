@@ -37,7 +37,7 @@ func TestOpenGeoDB_InvalidPath(t *testing.T) {
 }
 
 func TestGeoDB_CountryCode_NilReceiver(t *testing.T) {
-	var nilDB *GeoDB
+	var nilDB *DB
 	code := nilDB.CountryCode("8.8.8.8")
 
 	if code != "" {
@@ -46,7 +46,7 @@ func TestGeoDB_CountryCode_NilReceiver(t *testing.T) {
 }
 
 func TestGeoDB_CountryCode_InvalidIP(t *testing.T) {
-	db := &GeoDB{}
+	db := &DB{}
 	code := db.CountryCode("not-an-ip")
 
 	if code != "" {
@@ -61,7 +61,7 @@ func TestFilterNonRussia_AllNonRU(t *testing.T) {
 		{Server: "192.168.1.20"},
 	}
 
-	result := FilterNonRussia(configs, &GeoDB{})
+	result := FilterNonRussia(configs, &DB{})
 
 	if len(result) != 2 {
 		t.Fatalf("expected 2 configs, got %d", len(result))

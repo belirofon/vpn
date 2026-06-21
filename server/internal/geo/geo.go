@@ -9,25 +9,25 @@ import (
 	"vpn-server/internal/model"
 )
 
-type GeoDB struct {
+type DB struct {
 	db *geoip2.Reader
 }
 
-func OpenGeoDB(path string) (*GeoDB, error) {
+func OpenGeoDB(path string) (*DB, error) {
 	db, err := geoip2.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open GeoIP DB %s: %w", path, err)
 	}
-	return &GeoDB{db: db}, nil
+	return &DB{db: db}, nil
 }
 
-func (g *GeoDB) Close() {
+func (g *DB) Close() {
 	if g.db != nil {
 		g.db.Close()
 	}
 }
 
-func (g *GeoDB) CountryCode(ip string) string {
+func (g *DB) CountryCode(ip string) string {
 	if g == nil || g.db == nil {
 		return ""
 	}
@@ -45,7 +45,7 @@ func (g *GeoDB) CountryCode(ip string) string {
 	return record.Country.IsoCode
 }
 
-func FilterNonRussia(configs []*model.VpnConfig, g *GeoDB) []*model.VpnConfig {
+func FilterNonRussia(configs []*model.VpnConfig, g *DB) []*model.VpnConfig {
 	if g == nil {
 		return configs
 	}

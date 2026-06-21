@@ -15,19 +15,19 @@ import (
 
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
-	mu       sync.RWMutex
-	status   model.ServerStatus
+	mu        sync.RWMutex
+	status    model.ServerStatus
 	statusMsg string
-	configs  []model.VpnConfig
-	updated  time.Time
-	pl       *pipeline.Pipeline
-	ticker   *time.Ticker
-	stopCh   chan struct{}
-	logger   *slog.Logger
+	configs   []model.VpnConfig
+	updated   time.Time
+	pl        *pipeline.Pipeline
+	ticker    *time.Ticker
+	stopCh    chan struct{}
+	logger    *slog.Logger
 }
 
 // NewCache creates a new ConfigCache.
-func NewCache(cfg config.Config, g *geo.GeoDB, logger *slog.Logger) *ConfigCache {
+func NewCache(cfg config.Config, g *geo.DB, logger *slog.Logger) *ConfigCache {
 	if logger == nil {
 		logger = slog.Default()
 	}

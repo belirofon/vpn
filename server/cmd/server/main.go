@@ -25,7 +25,7 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	var geoDB *geo.GeoDB
+	var geoDB *geo.DB
 	if cfg.GeoIPDBPath != "" {
 		db, err := geo.OpenGeoDB(cfg.GeoIPDBPath)
 		if err != nil {
@@ -49,8 +49,9 @@ func main() {
 	handler.SetupRoutes(r, c)
 
 	srv := &http.Server{
-		Addr:    cfg.ListenAddr,
-		Handler: r,
+		Addr:              cfg.ListenAddr,
+		Handler:           r,
+		ReadHeaderTimeout: 30 * time.Second,
 	}
 
 	go func() {
