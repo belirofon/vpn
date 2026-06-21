@@ -26,6 +26,7 @@ jobs:
           source: server/
           target: ~/vpn-server/
           strip_components: 1
+          rm: true
 
       - name: Build and restart
         uses: appleboy/ssh-action@v1.0.3
