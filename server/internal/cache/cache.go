@@ -15,18 +15,18 @@ import (
 
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
-	mu          sync.RWMutex
-	cfg         config.Config
-	status      model.ServerStatus
-	statusMsg   string
-	configs     []model.VpnConfig
-	warpConfig  *model.WarpConfig
-	updated     time.Time
-	startedAt   time.Time
-	pl          *pipeline.Pipeline
-	ticker      *time.Ticker
-	stopCh      chan struct{}
-	logger      *slog.Logger
+	mu         sync.RWMutex
+	cfg        config.Config
+	status     model.ServerStatus
+	statusMsg  string
+	configs    []model.VpnConfig
+	warpConfig *model.WarpConfig
+	updated    time.Time
+	startedAt  time.Time
+	pl         *pipeline.Pipeline
+	ticker     *time.Ticker
+	stopCh     chan struct{}
+	logger     *slog.Logger
 }
 
 // NewCache creates a new ConfigCache.

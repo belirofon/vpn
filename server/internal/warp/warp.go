@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,10 +17,10 @@ import (
 )
 
 const (
-	apiBaseURL    = "https://api.cloudflareclient.com/v0a2222"
-	warpHost      = "engage.cloudflareclient.com"
-	warpPort      = 2408
-	warpDNS       = "1.1.1.1"
+	apiBaseURL     = "https://api.cloudflareclient.com/v0a2222"
+	warpHost       = "engage.cloudflareclient.com"
+	warpPort       = 2408
+	warpDNS        = "1.1.1.1"
 	cfPublicKeyB64 = "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="
 )
 
@@ -59,12 +58,6 @@ type registrationResponse struct {
 			} `json:"addresses"`
 		} `json:"interface"`
 	} `json:"config"`
-}
-
-func randomHex(n int) string {
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 func newUUID() string {
