@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,43 +20,44 @@ func main() {
 	config.LoadDotEnv()
 	cfg := config.LoadConfig()
 
-	// GeoIP (optional)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	var geoDB *geo.GeoDB
 	if cfg.GeoIPDBPath != "" {
 		db, err := geo.OpenGeoDB(cfg.GeoIPDBPath)
 		if err != nil {
-			log.Printf("WARN: GeoIP not available (%v), geo-filtering disabled", err)
+			logger.Warn("GeoIP not available, geo-filtering disabled", "error", err)
 		} else {
 			geoDB = db
 			defer geoDB.Close()
 		}
 	} else {
-		log.Println("INFO: GEOIP_DB_PATH not set, geo-filtering disabled")
+		logger.Info("GEOIP_DB_PATH not set, geo-filtering disabled")
 	}
 
-	cache := cache.NewCache(cfg, geoDB)
-	cache.Init()
-	cache.Start()
-	defer cache.Stop()
+	c := cache.NewCache(cfg, geoDB, logger)
+	c.Init()
+	c.Start()
+	defer c.Stop()
 
-	// Gin router
 	r := gin.Default()
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 
-	handler.SetupRoutes(r, cache, &cfg)
-	handler.SetupUpdateRoutes(r)
+	handler.SetupRoutes(r, c)
 
-	// HTTP server
 	srv := &http.Server{
 		Addr:    cfg.ListenAddr,
 		Handler: r,
 	}
 
-	// Graceful shutdown
 	go func() {
-		log.Printf("INFO: server starting on %s", cfg.ListenAddr)
+		logger.Info("server starting", "addr", cfg.ListenAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("FATAL: server error: %v", err)
+			logger.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -64,16 +65,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("INFO: shutting down server...")
+	logger.Info("shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("FATAL: server shutdown error: %v", err)
+		logger.Error("server shutdown error", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("INFO: server stopped")
+	logger.Info("server stopped")
 }
 
 func corsMiddleware(origins string) gin.HandlerFunc {

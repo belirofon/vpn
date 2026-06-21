@@ -161,6 +161,8 @@ Server status with summary of tested configs.
 }
 ```
 
+Returns `503 Service Unavailable` when status is not `ready`.
+
 ### `GET /api/best-config`
 
 Returns the **best performing** (lowest latency) **non-Russian** proxy configuration.
@@ -186,6 +188,8 @@ Returns the **best performing** (lowest latency) **non-Russian** proxy configura
 }
 ```
 
+Returns `503` with `{"error":"no_available_configs","message":"..."}` if no configs available.
+
 ### `GET /api/configs`
 
 Returns **all** tested and geo-filtered configurations (sorted by latency).
@@ -198,13 +202,17 @@ Returns **all** tested and geo-filtered configurations (sorted by latency).
 }
 ```
 
+Returns `503 Service Unavailable` when status is not `ready`.
+
 ### `POST /api/refresh`
 
-Triggers an immediate refresh of the config cache (fetch → parse → test → geo-filter).
+Triggers an immediate refresh of the config cache (fetch → parse → test → geo → reality filter → sort).
 
 ```json
 {"status": "refreshing"}
 ```
+
+Returns `409 Conflict` if a refresh is already in progress.
 
 ## 📱 Mobile Client
 
@@ -298,7 +306,7 @@ This will:
 ### Environment Variables
 
 | Variable | Required | Default | Description |
-|---|---|---|---|
+|---|---|---|---|---|
 | `SUBSCRIPTION_URL` | ✅ | — | URL to fetch proxy configs from |
 | `DUCK_DNS_TOKEN` | ✅ | — | DuckDNS API token for auto DNS update |
 | `DOMAIN` | — | `belirofon-vpn.duckdns.org` | Domain for HTTPS cert |
@@ -306,6 +314,8 @@ This will:
 | `REFRESH_INTERVAL` | — | `30m` | Config cache refresh interval |
 | `PING_TIMEOUT` | — | `5s` | Ping timeout per config |
 | `MOCK_CONFIGS` | — | `false` | Use mock configs (for testing) |
+| `SKIP_VERIFY_TLS` | — | `true` | Skip TLS certificate verification (proxy testing compat) |
+| `CORS_ORIGINS` | — | `*` | Allowed CORS origins |
 
 ### CI/CD (GitHub Actions)
 
@@ -347,14 +357,21 @@ vpn/
 │   ├── internal/
 │   │   ├── cache/cache.go           # Config cache with periodic refresh
 │   │   ├── config/config.go         # Environment config loader
+│   │   ├── config/config_test.go    # Config tests (11)
 │   │   ├── fetcher/fetcher.go       # HTTP subscription fetcher
 │   │   ├── geo/geo.go               # GeoIP lookup & RU filtering
+│   │   ├── geo/geo_test.go          # GeoIP tests (6)
 │   │   ├── handler/handlers.go      # HTTP API handlers (Gin)
 │   │   ├── model/models.go          # Data models & status types
 │   │   ├── parser/parser.go         # VLESS/VMess/Trojan/SS parser
+│   │   ├── parser/parser_test.go    # Parser tests (24)
+│   │   ├── pipeline/pipeline.go     # Config processing pipeline
+│   │   ├── pipeline/pipeline_test.go # Pipeline tests (6)
 │   │   ├── resolver/resolver.go     # DNS resolver
+│   │   ├── resolver/resolver_test.go # Resolver tests
 │   │   └── tester/                  # Connectivity tester
 │   │       ├── tester.go            # TCP/TLS/WS testing
+│   │       ├── tester_test.go       # Tester tests (6)
 │   │       └── vless.go             # VLESS proxy test
 │   ├── Caddyfile                    # Caddy reverse proxy config
 │   ├── Dockerfile                   # Multi-stage Docker build
@@ -373,11 +390,20 @@ vpn/
 │   │   │   └── models/vpn_config.dart   # Config data model
 │   │   └── presentation/screens/
 │   │       └── home_screen.dart     # Main UI (connect/disconnect)
+│   ├── test/
+│   │   ├── data/models/vpn_config_test.dart  # Model tests (12)
+│   │   └── widget_test.dart                 # Widget tests
 │   ├── android/                     # Android platform
 │   └── ios/                         # iOS platform
 │
-├── .github/workflows/deploy.yml     # CI/CD pipeline
+├── .github/workflows/               # CI/CD pipelines
+│   ├── deploy.yml                   # Deploy on push to master
+│   ├── build-android.yml            # APK build on tag push
+│   └── build-ios.yml                # iOS build (requires macOS runner)
 ├── Makefile                         # Build & deploy commands
+├── PLAN.md                          # Architecture & implementation details
+├── TECH_DEBT.md                     # Technical debt registry
+├── TODO.md                          # Work plan
 └── README.md                        # This file
 ```
 
@@ -402,19 +428,28 @@ make run-server SUBSCRIPTION_URL="your_subscription_url"
 
 ## 🛣️ Roadmap
 
-- [x] Multi-protocol parser (VLESS, VMess, Trojan, SS)
-- [x] Connectivity tester with real protocol handshakes
-- [x] GeoIP filtering with non-RU preference + RU fallback
-- [x] DuckDNS auto DNS update
-- [x] Caddy reverse proxy with auto-HTTPS (Let's Encrypt HTTP-01)
-- [x] Flutter mobile client (Android — working, iOS — requires Apple Developer)
-- [x] CI/CD deployment pipeline (Docker + GitHub Actions)
-- [x] GitHub Actions: automated Android APK builds on tag push
-- [x] REALITY filter (skip unsupported configs for Flutter client)
-- [ ] REALITY support in Flutter client (uTLS/Xray)
-- [ ] Push notifications for config updates
-- [ ] Multi-user support (per-user config cache)
-- [ ] WireGuard protocol support
+### ✅ Completed
+- Multi-protocol parser (VLESS, VMess, Trojan, SS)
+- Connectivity tester with real protocol handshakes (TCP/TLS/WS/VLESS/Trojan/REALITY)
+- Config processing pipeline (fetch → parse → test → geo → reality → sort)
+- GeoIP filtering with non-RU preference + RU fallback
+- DuckDNS auto DNS update
+- Caddy reverse proxy with auto-HTTPS (Let's Encrypt HTTP-01)
+- Flutter mobile client (Android — working, iOS — requires Apple Developer)
+- CI/CD deployment pipeline (Docker + GitHub Actions)
+- GitHub Actions: automated Android APK builds on tag push
+- REALITY filter (skip unsupported configs for Flutter client)
+- Unit tests for Go (parser, config, geo, tester, pipeline, resolver) and Dart (vpn_config)
+- Configurable TLS verification (SKIP_VERIFY_TLS) and CORS origins (CORS_ORIGINS)
+- Graceful shutdown (SIGINT/SIGTERM)
+
+### ⬜ Upcoming
+- REALITY support in Flutter client (uTLS/Xray)
+- Push notifications for config updates
+- Multi-user support (per-user config cache)
+- WireGuard protocol support
+- Dark theme
+- Auto-connect on startup
 
 ## 📄 License
 

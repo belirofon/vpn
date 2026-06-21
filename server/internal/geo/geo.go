@@ -2,7 +2,7 @@ package geo
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 
 	"github.com/oschwald/geoip2-golang"
@@ -50,7 +50,6 @@ func FilterNonRussia(configs []*model.VpnConfig, g *GeoDB) []*model.VpnConfig {
 		return configs
 	}
 
-	// First pass: try to get non-RU configs
 	var nonRU, ru, unknown []*model.VpnConfig
 	for _, cfg := range configs {
 		country := g.CountryCode(cfg.Server)
@@ -65,12 +64,11 @@ func FilterNonRussia(configs []*model.VpnConfig, g *GeoDB) []*model.VpnConfig {
 		}
 	}
 
-	// Prefer non-RU, fall back to all if empty
 	if len(nonRU) > 0 {
-		log.Printf("INFO: GeoIP: %d non-RU, %d RU, %d unknown", len(nonRU), len(ru), len(unknown))
+		slog.Info("GeoIP filter", "non_ru", len(nonRU), "ru", len(ru), "unknown", len(unknown))
 		return nonRU
 	}
 
-	log.Printf("INFO: GeoIP: all configs are RU/unknown (%d RU, %d unknown), using as fallback", len(ru), len(unknown))
+	slog.Info("GeoIP filter: all configs are RU/unknown, using as fallback", "ru", len(ru), "unknown", len(unknown))
 	return append(ru, unknown...)
 }
