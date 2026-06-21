@@ -80,6 +80,21 @@ func SetupRoutes(r *gin.Engine, c *cache.ConfigCache) {
 			})
 		})
 
+		api.GET("/warp-config", func(ctx *gin.Context) {
+			wc := c.GetWarpConfig()
+			if wc == nil {
+				ctx.JSON(http.StatusNotFound, model.ErrorResponse{
+					Error:   "warp_not_available",
+					Message: "WARP config not generated or WARP is disabled",
+				})
+				return
+			}
+			ctx.JSON(http.StatusOK, model.WarpConfigResponse{
+				Config:  wc,
+				Updated: c.GetUpdated(),
+			})
+		})
+
 		api.POST("/refresh", func(ctx *gin.Context) {
 			status, msg := c.Status()
 			if status == model.StatusReady || status == model.StatusError {

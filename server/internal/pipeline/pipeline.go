@@ -18,6 +18,7 @@ import (
 	"vpn-server/internal/model"
 	"vpn-server/internal/parser"
 	"vpn-server/internal/tester"
+	"vpn-server/internal/warp"
 )
 
 const fetchTimeout = 30 * time.Second
@@ -110,6 +111,12 @@ func (p *Pipeline) Run(ctx context.Context) ([]model.VpnConfig, error) {
 		"latency_ms", result[0].LatencyMs,
 	)
 	return result, nil
+}
+
+// RunWarp generates a WARP Cloudflare config and tests connectivity.
+func (p *Pipeline) RunWarp(ctx context.Context) (*model.WarpConfig, error) {
+	p.logger.InfoContext(ctx, "generating WARP config")
+	return warp.Generate(ctx, p.cfg.PingTimeout)
 }
 
 // filterReality removes REALITY configs when non-REALITY exist.

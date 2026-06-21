@@ -58,4 +58,22 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// WarpConfig represents a Cloudflare WARP WireGuard configuration.
+type WarpConfig struct {
+	Protocol        string `json:"protocol"`
+	PrivateKey      string `json:"private_key"`
+	AddressV4       string `json:"address_v4"`
+	AddressV6       string `json:"address_v6"`
+	DNSServers      string `json:"dns"`
+	ServerPublicKey string `json:"server_public_key"`
+	Endpoint        string `json:"endpoint"`
+	ClientID        string `json:"client_id,omitempty"`
+	LatencyMs       int64  `json:"latency_ms"`
+}
+
+type WarpConfigResponse struct {
+	Config  *WarpConfig `json:"config"`
+	Updated string      `json:"updated"`
+}
+
 const ErrNoAvailableConfigs = "no_available_configs"
