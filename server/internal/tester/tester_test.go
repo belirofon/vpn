@@ -62,9 +62,9 @@ func TestParseUUID_AllFs(t *testing.T) {
 
 func TestParseUUID_InvalidLength(t *testing.T) {
 	tests := []string{
-		"",                    // empty
-		"too-short",           // way too short
-		"550e8400-e29b-41d4",  // partial
+		"",                                 // empty
+		"too-short",                        // way too short
+		"550e8400-e29b-41d4",               // partial
 		"550e8400e29b41d4a716446655440000", // no dashes, but 32 chars — won't match 36
 	}
 

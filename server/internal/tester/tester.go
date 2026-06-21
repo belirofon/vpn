@@ -95,7 +95,8 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	// Trojan: simple password-authenticated proxy test
 	case cfg.Protocol == "trojan":
 		if cfg.TLS == "tls" {
-			tlsConn := tls.Client(conn, &tls.Config{ //nolint:gosec
+			//nolint:gosec
+			tlsConn := tls.Client(conn, &tls.Config{
 				ServerName:         cfg.Server,
 				InsecureSkipVerify: skipVerifyTLS,
 			})
@@ -111,7 +112,8 @@ func pingServer(ctx context.Context, cfg *model.VpnConfig, timeout time.Duration
 	// VMESS / SS / other: TCP + TLS + WS check (protocol-level test not implemented)
 	default:
 		if cfg.TLS == "tls" {
-			tlsConn := tls.Client(conn, &tls.Config{ //nolint:gosec
+			//nolint:gosec
+			tlsConn := tls.Client(conn, &tls.Config{
 				ServerName:         cfg.Server,
 				InsecureSkipVerify: skipVerifyTLS,
 			})

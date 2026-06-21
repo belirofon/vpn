@@ -16,13 +16,14 @@ import (
 const wsKey = "dGhlIHNhbXBsZSBub25jZQ=="
 
 func testVlessProxy(conn net.Conn, cfg *model.VpnConfig, timeout time.Duration, skipVerifyTLS bool) bool {
-	conn.SetDeadline(time.Now().Add(timeout))
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 
 	var tlsConn net.Conn = conn
 
 	switch cfg.TLS {
 	case "tls":
-		tc := tls.Client(conn, &tls.Config{ //nolint:gosec
+		//nolint:gosec
+		tc := tls.Client(conn, &tls.Config{
 			ServerName:         cfg.Server,
 			InsecureSkipVerify: skipVerifyTLS,
 		})
