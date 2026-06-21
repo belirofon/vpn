@@ -2,12 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vpn_client/data/api/api_client.dart';
-import 'package:vpn_client/data/models/vpn_config.dart';
-import 'package:vpn_client/core/vpn/vpn_service.dart';
+import 'package:vpn_client/domain/entities/vpn_config.dart';
+import 'package:vpn_client/domain/services/vpn_service.dart';
+import 'package:vpn_client/presentation/viewmodels/home_viewmodel.dart';
 import 'package:vpn_client/presentation/screens/home_screen.dart';
-import 'package:dio/dio.dart';
 
-// Mock VpnService for testing UI in isolation
 class MockVpnService implements VpnService {
   final _stateController = StreamController<VpnConnectionState>.broadcast();
   VpnConnectionState _state = VpnConnectionState.disconnected;
@@ -41,25 +40,32 @@ class MockVpnService implements VpnService {
   }
 }
 
+Widget _buildTestApp(ApiClient apiClient, HomeViewModel viewModel) {
+  return MaterialApp(
+    home: HomeScreen(
+      apiClient: apiClient,
+      viewModel: viewModel,
+    ),
+  );
+}
+
 void main() {
   group('HomeScreen', () {
     late ApiClient apiClient;
     late MockVpnService vpnService;
+    late HomeViewModel viewModel;
 
     setUp(() {
-      apiClient = ApiClient(Dio());
+      apiClient = ApiClient();
       vpnService = MockVpnService();
+      viewModel = HomeViewModel(
+        apiClient: apiClient,
+        vpnService: vpnService,
+      );
     });
 
     testWidgets('shows disconnected state initially', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildTestApp(apiClient, viewModel));
 
       expect(find.text('Disconnected'), findsOneWidget);
       expect(find.text('CONNECT'), findsOneWidget);
@@ -67,16 +73,8 @@ void main() {
     });
 
     testWidgets('shows error state when no server available', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildTestApp(apiClient, viewModel));
 
-      // Tap connect button — fails because no server, shows error
       await tester.tap(find.text('CONNECT'));
       await tester.pumpAndSettle();
 
@@ -84,17 +82,9 @@ void main() {
     });
 
     testWidgets('debug menu opens on long press', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildTestApp(apiClient, viewModel));
 
-      // Long press the shield icon
-      await tester.longPress(find.byIcon(Icons.shield_outlined));
+      await tester.longPress(find.byIcon(Icons.shield_outlined).last);
       await tester.pump();
 
       expect(find.text('Debug Settings'), findsOneWidget);
@@ -102,14 +92,7 @@ void main() {
     });
 
     testWidgets('shows app title', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: HomeScreen(
-            apiClient: apiClient,
-            vpnService: vpnService,
-          ),
-        ),
-      );
+      await tester.pumpWidget(_buildTestApp(apiClient, viewModel));
 
       expect(find.text('VPN Client'), findsOneWidget);
     });
