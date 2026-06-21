@@ -15,17 +15,18 @@ import (
 
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
-	mu        sync.RWMutex
-	cfg       config.Config
-	status    model.ServerStatus
-	statusMsg string
-	configs   []model.VpnConfig
-	updated   time.Time
-	startedAt time.Time
-	pl        *pipeline.Pipeline
-	ticker    *time.Ticker
-	stopCh    chan struct{}
-	logger    *slog.Logger
+	mu          sync.RWMutex
+	cfg         config.Config
+	status      model.ServerStatus
+	statusMsg   string
+	configs     []model.VpnConfig
+	warpConfig  *model.WarpConfig
+	updated     time.Time
+	startedAt   time.Time
+	pl          *pipeline.Pipeline
+	ticker      *time.Ticker
+	stopCh      chan struct{}
+	logger      *slog.Logger
 }
 
 // NewCache creates a new ConfigCache.
@@ -66,6 +67,18 @@ func (cc *ConfigCache) GetConfigs() []model.VpnConfig {
 	result := make([]model.VpnConfig, len(cc.configs))
 	copy(result, cc.configs)
 	return result
+}
+
+// GetWarpConfig returns the cached WARP config, or nil if not available.
+func (cc *ConfigCache) GetWarpConfig() *model.WarpConfig {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+
+	if cc.warpConfig == nil {
+		return nil
+	}
+	wc := *cc.warpConfig
+	return &wc
 }
 
 // GetBestConfig returns the lowest-latency config, or nil if empty.
@@ -130,22 +143,50 @@ func (cc *ConfigCache) refresh() {
 
 	result, err := cc.pl.Run(context.Background())
 	if err != nil {
-		cc.logger.Error("refresh failed", "error", err)
+		cc.logger.Error("pipeline failed", "error", err)
 		cc.setStatus(model.StatusError, err.Error())
-		return
+	} else {
+		cc.mu.Lock()
+		cc.configs = result
+		cc.mu.Unlock()
+
+		cc.logger.Info("pipeline complete",
+			"configs", len(result),
+			"fastest", result[0].Name,
+			"latency_ms", result[0].LatencyMs,
+		)
+	}
+
+	if cc.cfg.WarpEnabled {
+		cc.generateWarpConfig()
 	}
 
 	cc.mu.Lock()
-	cc.configs = result
 	cc.updated = time.Now()
-	cc.status = model.StatusReady
-	cc.statusMsg = ""
+	if cc.status != model.StatusError {
+		cc.status = model.StatusReady
+		cc.statusMsg = ""
+	}
+	cc.mu.Unlock()
+}
+
+func (cc *ConfigCache) generateWarpConfig() {
+	cc.logger.Info("generating WARP config")
+	wc, err := cc.pl.RunWarp(context.Background())
+	if err != nil {
+		cc.logger.Error("WARP generation failed", "error", err)
+		if wc == nil {
+			return
+		}
+	}
+
+	cc.mu.Lock()
+	cc.warpConfig = wc
 	cc.mu.Unlock()
 
-	cc.logger.Info("refresh complete",
-		"configs", len(result),
-		"fastest", result[0].Name,
-		"latency_ms", result[0].LatencyMs,
+	cc.logger.Info("WARP config ready",
+		"latency_ms", wc.LatencyMs,
+		"endpoint", wc.Endpoint,
 	)
 }
 
