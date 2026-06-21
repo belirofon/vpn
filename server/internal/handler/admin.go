@@ -173,5 +173,40 @@ func SetupAdminRoutes(r *gin.Engine, cc *cache.ConfigCache) {
 			clearAdminToken()
 			c.JSON(http.StatusOK, gin.H{"status": "logged_out"})
 		})
+
+		admin.GET("/warp", func(c *gin.Context) {
+			wc := cc.GetWarpConfig()
+			if wc == nil {
+				c.JSON(http.StatusOK, gin.H{
+					"available": false,
+					"config":    nil,
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"available": true,
+				"config":    wc,
+			})
+		})
+
+		admin.POST("/warp/generate", func(c *gin.Context) {
+			wc := cc.ForceGenerateWarp()
+			if wc == nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "warp_generation_failed",
+					"message": "WARP config generation failed",
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"status": "generated",
+				"config": wc,
+			})
+		})
+
+		admin.DELETE("/warp", func(c *gin.Context) {
+			cc.ClearWarpConfig()
+			c.JSON(http.StatusOK, gin.H{"status": "cleared"})
+		})
 	}
 }

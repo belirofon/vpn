@@ -4,6 +4,7 @@ abstract class HttpClient {
       {Map<String, dynamic>? data, Map<String, String>? headers});
   Future<HttpResponse> put(String url,
       {Map<String, dynamic>? data, Map<String, String>? headers});
+  Future<HttpResponse> delete(String url, {Map<String, String>? headers});
   void updateBaseUrl(String url);
 }
 

@@ -81,7 +81,18 @@
 
 ---
 
-## ⬜ Фаза 4 — Новые фичи
+## ✅ Фаза 4 — WARP & Admin Panel — ВЫПОЛНЕНО
+
+- [x] **Сервер: Cloudflare WARP генерация** — модуль `internal/warp/warp.go` (регистрация устройства, ключи X25519, тест latency)
+- [x] **Сервер: WARP admin API** — `GET/POST/DELETE /api/admin/warp` в `admin.go`
+- [x] **Клиент: AdminWarpStatus DTO** — `admin_models.dart`
+- [x] **Клиент: WARP методы ApiClient** — `adminGetWarp`, `adminGenerateWarp`, `adminDeleteWarp`
+- [x] **Клиент: AdminViewModel WARP state** — загрузка, генерация, удаление с UI-фидбеком
+- [x] **Клиент: WARP секция в админке** — карточка с деталями (endpoint, client_id, latency, protocol) + кнопки Generate/Delete
+- [x] **HttpClient: добавлен delete метод** — в абстракцию и Dio имплементацию
+- [x] **Документация** — README, TODO.md, TECH_DEBT.md обновлены
+
+## ⬜ Фаза 5 — Новые фичи
 
 - [ ] **Выбор конкретного сервера из списка** — продвинутый режим
 - [ ] **Поддержка REALITY в Flutter клиенте** — uTLS/Xray core
@@ -100,10 +111,11 @@
 1. ✅ Фаза 0 — Безопасность
 2. ✅ Фаза 0.5 — Убрать хардкод домена
 3. ✅ Фаза 1 — Тесты (основные написаны)
-4. ⬜ Линтеры в CI + Go и Dart тесты в CI
-5. ⬜ Фаза 2 — Архитектура (клиент)
+4. ✅ Линтеры в CI + Go и Dart тесты в CI
+5. ✅ Фаза 2 — Архитектура (клиент)
 6. ⬜ Фаза 3 — Code Quality
-7. ⬜ Фаза 4 — Новые фичи
+7. ✅ Фаза 4 — WARP & Admin Panel
+8. ⬜ Фаза 5 — Новые фичи
 ```
 
 ### Быстрые победы (1-2 часа)

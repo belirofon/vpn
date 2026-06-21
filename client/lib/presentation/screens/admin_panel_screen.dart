@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/api/api_client.dart';
 import '../../data/dto/admin_models.dart';
+import '../../domain/entities/warp_config.dart';
 import '../viewmodels/admin_viewmodel.dart';
 
 class AdminPanelScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _refreshIntervalController = TextEditingController();
     _viewModel.addListener(_onDataLoaded);
     _viewModel.loadData();
+    _viewModel.loadWarp();
   }
 
   @override
@@ -73,6 +75,36 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ? 'Config refresh triggered'
             : 'Failed to trigger refresh'),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _generateWarp() async {
+    final config = await _viewModel.generateWarp();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(config != null
+            ? 'WARP config generated (${config.latencyMs}ms)'
+            : 'Failed to generate WARP config'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: config != null
+            ? Colors.green
+            : Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
+  Future<void> _deleteWarp() async {
+    final ok = await _viewModel.deleteWarp();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(ok ? 'WARP config deleted' : 'Failed to delete WARP config'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor:
+            ok ? Colors.green : Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -149,7 +181,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   int _sectionCount() {
-    int count = 3; // health, config, endpoints
+    int count = 4; // health, config, endpoints, warp
     if (_viewModel.config != null) count++;
     return count;
   }
@@ -173,6 +205,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           endpoints: _viewModel.endpoints,
         );
       case 3:
+        return _WarpSection(
+          warpStatus: _viewModel.warpStatus,
+          isLoading: _viewModel.isWarpLoading,
+          isGenerating: _viewModel.isWarpGenerating,
+          onGenerate: _generateWarp,
+          onDelete: _deleteWarp,
+        );
+      case 4:
         if (_viewModel.config != null) {
           return _ServerSettingsSection(config: _viewModel.config!);
         }
@@ -394,6 +434,117 @@ class _ServerSettingsSection extends StatelessWidget {
               label: 'CORS Origins', value: config.corsOrigins),
         ],
       ),
+    );
+  }
+}
+
+// -- WARP Section --
+
+class _WarpSection extends StatelessWidget {
+  final AdminWarpStatus? warpStatus;
+  final bool isLoading;
+  final bool isGenerating;
+  final VoidCallback onGenerate;
+  final VoidCallback onDelete;
+
+  const _WarpSection({
+    required this.warpStatus,
+    required this.isLoading,
+    required this.isGenerating,
+    required this.onGenerate,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = warpStatus;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _SectionCard(
+        icon: Icons.cloud_outlined,
+        title: 'WARP Config',
+        trailing: isLoading || isGenerating
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : null,
+        children: [
+          if (isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Loading...',
+                  style: TextStyle(color: Colors.grey)),
+            )
+          else if (isGenerating)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Generating WARP config...',
+                  style: TextStyle(color: Colors.grey)),
+            )
+          else if (status != null && status.available && status.config != null)
+            _WarpDetails(config: status.config!)
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('WARP config not generated',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          const SizedBox(height: 12),
+          if (!isLoading && !isGenerating)
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: onGenerate,
+                    child: const Text('Generate WARP'),
+                  ),
+                ),
+                if (status != null && status.available) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onDelete,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                      child: const Text('Delete WARP'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarpDetails extends StatelessWidget {
+  final WarpConfig config;
+
+  const _WarpDetails({required this.config});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InfoRow(label: 'Endpoint', value: config.endpoint),
+        if (config.clientId != null && config.clientId!.isNotEmpty)
+          _InfoRow(label: 'Client ID', value: config.clientId!),
+        _InfoRow(
+          label: 'Latency',
+          value: config.latencyMs >= 0
+              ? '${config.latencyMs}ms'
+              : 'Unreachable',
+        ),
+        _InfoRow(label: 'Protocol', value: config.protocol),
+      ],
     );
   }
 }

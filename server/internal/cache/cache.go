@@ -222,3 +222,18 @@ func (cc *ConfigCache) SetRefreshInterval(d time.Duration) {
 		cc.ticker.Reset(d)
 	}
 }
+
+// ForceGenerateWarp generates and caches a WARP config, returns it (may be offline fallback).
+func (cc *ConfigCache) ForceGenerateWarp() *model.WarpConfig {
+	cc.logger.Info("forced WARP generation from admin")
+	cc.generateWarpConfig()
+	return cc.GetWarpConfig()
+}
+
+// ClearWarpConfig removes the cached WARP config.
+func (cc *ConfigCache) ClearWarpConfig() {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.warpConfig = nil
+	cc.logger.Info("WARP config cleared")
+}

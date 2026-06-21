@@ -1,3 +1,5 @@
+import '../../domain/entities/warp_config.dart';
+
 class AdminHealth {
   final String status;
   final String? message;
@@ -78,5 +80,21 @@ class AdminEndpoint {
       'PATCH' => 0xFF9C27B0,
       _ => 0xFF9E9E9E,
     };
+  }
+}
+
+class AdminWarpStatus {
+  final bool available;
+  final WarpConfig? config;
+
+  const AdminWarpStatus({required this.available, this.config});
+
+  factory AdminWarpStatus.fromJson(Map<String, dynamic> json) {
+    return AdminWarpStatus(
+      available: json['available'] as bool? ?? false,
+      config: json['config'] != null
+          ? WarpConfig.fromJson(json['config'] as Map<String, dynamic>)
+          : null,
+    );
   }
 }

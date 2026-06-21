@@ -41,6 +41,8 @@
 | **Refresh API** | Trigger config cache refresh on demand |
 | **Periodic Updates** | Auto-refreshes config cache every `N` minutes |
 | **REALITY Filter** | Skips VLESS+REALITY configs (not yet supported by Flutter client) |
+| **Cloudflare WARP** | Generates WARP WireGuard config as a fallback tunnel |
+| **Admin Panel** | Web-based admin: config management, WARP control, server monitoring |
 
 ## 🏗️ Architecture
 
@@ -86,9 +88,9 @@
 | Component | Role |
 |---|---|
 | **Caddy** | Reverse proxy, TLS termination (Let's Encrypt), HTTP→HTTPS redirect |
-| **Go Server** | API backend — fetches, parses, tests, caches, and serves proxy configs |
+| **Go Server** | API backend — fetches, parses, tests, caches, and serves proxy configs + WARP generation |
 | **DuckDNS** | Keeps `belirofon-vpn.duckdns.org` pointed at your server IP |
-| **Flutter Client** | Mobile app — fetches best config from API and establishes VPN connection |
+| **Flutter Client** | Mobile app — fetches best config from API, establishes VPN connection, admin panel |
 | **GeoIP DB** | MaxMind GeoLite2 database for country-level geo-filtering |
 
 ## 🚀 Quick Start
@@ -214,6 +216,112 @@ Triggers an immediate refresh of the config cache (fetch → parse → test → 
 
 Returns `409 Conflict` if a refresh is already in progress.
 
+### `GET /api/warp-config`
+
+Returns the current Cloudflare WARP WireGuard config (if generated and WARP is enabled).
+
+```json
+{
+  "config": {
+    "protocol": "warp",
+    "private_key": "...",
+    "address_v4": "100.96.0.1/12",
+    "address_v6": "2606:4700:110:.../128",
+    "dns": "1.1.1.1",
+    "server_public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+    "endpoint": "engage.cloudflareclient.com:2408",
+    "client_id": "...",
+    "latency_ms": 42
+  },
+  "updated": "2026-06-21T12:00:00Z"
+}
+```
+
+Returns `404` with `{"error":"warp_not_available",...}` if WARP is disabled or not yet generated.
+
+### Admin API
+
+Authenticated endpoints under `/api/admin/`. Login first to obtain a bearer token:
+
+```bash
+curl -X POST https://your.domain/api/admin/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"secret"}'
+# → {"token":"..."}
+```
+
+All subsequent requests require `Authorization: Bearer <token>`.
+
+#### `GET /api/admin/health`
+
+Server health with uptime and config details.
+
+```json
+{
+  "status": "ready",
+  "message": "",
+  "configs_tested": 42,
+  "uptime": "12h34m56s",
+  "subscription_url": "https://...",
+  "refresh_interval": "30m0s"
+}
+```
+
+#### `GET /api/admin/config`
+
+Runtime configuration values.
+
+```json
+{
+  "subscription_url": "https://...",
+  "refresh_interval": "30m0s",
+  "ping_timeout": "5s",
+  "mock_configs": false,
+  "skip_verify_tls": true,
+  "cors_origins": "*"
+}
+```
+
+#### `PUT /api/admin/config`
+
+Update runtime config fields (both optional).
+
+```json
+{"subscription_url": "https://...", "refresh_interval": "30m"}
+```
+
+#### `POST /api/admin/refresh-configs`
+
+Triggers an async config cache refresh.
+
+```json
+{"status": "refreshing"}
+```
+
+#### `GET /api/admin/endpoints`
+
+Lists all registered API routes (methods + paths).
+
+```json
+{"endpoints": [...], "total": 25}
+```
+
+#### WARP Management
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/warp` | Current WARP status (`{available, config}`) |
+| `POST` | `/api/admin/warp/generate` | Force re-generate WARP config |
+| `DELETE` | `/api/admin/warp` | Clear cached WARP config |
+
+#### `POST /api/admin/logout`
+
+Invalidates the current admin session token.
+
+```json
+{"status": "logged_out"}
+```
+
 ## 📱 Mobile Client
 
 The Flutter client is a cross-platform mobile app that connects to the VPN server and establishes a V2Ray-based VPN tunnel on your device.
@@ -227,6 +335,8 @@ The Flutter client is a cross-platform mobile app that connects to the VPN serve
 | **Connected** | Shield icon (green) + server info card + "DISCONNECT" button |
 
 **Debug Menu**: Long-press the shield icon to open debug settings and change the server URL.
+
+**Admin Panel**: Navigate to the admin screen to manage server configuration, monitor health, view API endpoints, control WARP config (generate/test/delete), and update runtime settings. Access requires admin credentials.
 
 ### Download
 
@@ -316,6 +426,9 @@ This will:
 | `MOCK_CONFIGS` | — | `false` | Use mock configs (for testing) |
 | `SKIP_VERIFY_TLS` | — | `true` | Skip TLS certificate verification (proxy testing compat) |
 | `CORS_ORIGINS` | — | `*` | Allowed CORS origins |
+| `ADMIN_EMAIL` | — | — | Admin login email (auth required for admin endpoints) |
+| `ADMIN_PASSWORD` | — | — | Admin login password |
+| `WARP_ENABLED` | — | `false` | Enable Cloudflare WARP WireGuard config generation |
 
 ### CI/CD (GitHub Actions)
 
@@ -361,7 +474,8 @@ vpn/
 │   │   ├── fetcher/fetcher.go       # HTTP subscription fetcher
 │   │   ├── geo/geo.go               # GeoIP lookup & RU filtering
 │   │   ├── geo/geo_test.go          # GeoIP tests (6)
-│   │   ├── handler/handlers.go      # HTTP API handlers (Gin)
+│   │   ├── handler/handlers.go      # Public API handlers (Gin)
+│   │   ├── handler/admin.go         # Admin API handlers (auth, config, WARP)
 │   │   ├── model/models.go          # Data models & status types
 │   │   ├── parser/parser.go         # VLESS/VMess/Trojan/SS parser
 │   │   ├── parser/parser_test.go    # Parser tests (24)
@@ -369,10 +483,11 @@ vpn/
 │   │   ├── pipeline/pipeline_test.go # Pipeline tests (6)
 │   │   ├── resolver/resolver.go     # DNS resolver
 │   │   ├── resolver/resolver_test.go # Resolver tests
-│   │   └── tester/                  # Connectivity tester
-│   │       ├── tester.go            # TCP/TLS/WS testing
-│   │       ├── tester_test.go       # Tester tests (6)
-│   │       └── vless.go             # VLESS proxy test
+│   │   ├── tester/                  # Connectivity tester
+│   │   │   ├── tester.go            # TCP/TLS/WS testing
+│   │   │   ├── tester_test.go       # Tester tests (6)
+│   │   │   └── vless.go             # VLESS proxy test
+│   │   └── warp/warp.go             # Cloudflare WARP config generation
 │   ├── Caddyfile                    # Caddy reverse proxy config
 │   ├── Dockerfile                   # Multi-stage Docker build
 │   ├── docker-compose.yml           # Docker services
@@ -387,9 +502,19 @@ vpn/
 │   │   │   └── web_vpn_service.dart     # Web mock (UI testing)
 │   │   ├── data/
 │   │   │   ├── api/api_client.dart  # HTTP API client (Dio)
+│   │   │   ├── dto/                 # Data transfer objects
+│   │   │   │   ├── admin_models.dart    # Admin DTOs
+│   │   │   │   └── vpn_config_dto.dart  # VPN config DTO
 │   │   │   └── models/vpn_config.dart   # Config data model
-│   │   └── presentation/screens/
-│   │       └── home_screen.dart     # Main UI (connect/disconnect)
+│   │   ├── domain/entities/
+│   │   │   ├── vpn_config.dart      # VPN config entity
+│   │   │   └── warp_config.dart     # WARP config entity
+│   │   └── presentation/
+│   │       ├── screens/
+│   │       │   ├── home_screen.dart     # Main UI (connect/disconnect)
+│   │       │   └── admin_panel_screen.dart  # Admin panel (config, WARP)
+│   │       └── viewmodels/
+│   │           └── admin_viewmodel.dart  # Admin panel state/logic
 │   ├── test/
 │   │   ├── data/models/vpn_config_test.dart  # Model tests (12)
 │   │   └── widget_test.dart                 # Widget tests
@@ -442,6 +567,10 @@ make run-server SUBSCRIPTION_URL="your_subscription_url"
 - Unit tests for Go (parser, config, geo, tester, pipeline, resolver) and Dart (vpn_config)
 - Configurable TLS verification (SKIP_VERIFY_TLS) and CORS origins (CORS_ORIGINS)
 - Graceful shutdown (SIGINT/SIGTERM)
+- Cloudflare WARP WireGuard config generation with device registration and latency test
+- Admin panel: server config management (subscription URL, refresh interval)
+- Admin panel: WARP config management (generate, view, delete)
+- Admin API with bearer token auth and session management
 
 ### ⬜ Upcoming
 - REALITY support in Flutter client (uTLS/Xray)

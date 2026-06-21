@@ -204,6 +204,45 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>?> adminGetWarp() async {
+    return _adminGet('/api/admin/warp');
+  }
+
+  Future<Map<String, dynamic>?> adminGenerateWarp() async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return null;
+
+    try {
+      final response = await _http.post(
+        '/api/admin/warp/generate',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminGenerateWarp error: $e');
+      return null;
+    }
+  }
+
+  Future<bool> adminDeleteWarp() async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return false;
+
+    try {
+      final response = await _http.delete(
+        '/api/admin/warp',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminDeleteWarp error: $e');
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> _adminGet(String path) async {
     final token = _prefs?.getString('admin_token');
     if (token == null) return null;

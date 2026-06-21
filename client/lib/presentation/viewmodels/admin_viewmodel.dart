@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../data/api/api_client.dart';
 import '../../data/dto/admin_models.dart';
+import '../../domain/entities/warp_config.dart';
 
 class AdminViewModel extends ChangeNotifier {
   final ApiClient _apiClient;
@@ -11,6 +12,9 @@ class AdminViewModel extends ChangeNotifier {
   List<AdminEndpoint>? _endpoints;
   AdminConfig? _config;
   bool _isSavingConfig = false;
+  AdminWarpStatus? _warpStatus;
+  bool _isWarpLoading = false;
+  bool _isWarpGenerating = false;
 
   AdminViewModel({required ApiClient apiClient}) : _apiClient = apiClient;
 
@@ -20,6 +24,9 @@ class AdminViewModel extends ChangeNotifier {
   List<AdminEndpoint>? get endpoints => _endpoints;
   AdminConfig? get config => _config;
   bool get isSavingConfig => _isSavingConfig;
+  AdminWarpStatus? get warpStatus => _warpStatus;
+  bool get isWarpLoading => _isWarpLoading;
+  bool get isWarpGenerating => _isWarpGenerating;
 
   Future<void> loadData() async {
     _isLoading = true;
@@ -83,5 +90,48 @@ class AdminViewModel extends ChangeNotifier {
 
   Future<void> logout() async {
     await _apiClient.adminLogout();
+  }
+
+  Future<void> loadWarp() async {
+    _isWarpLoading = true;
+    notifyListeners();
+
+    final result = await _apiClient.adminGetWarp();
+    if (result != null) {
+      _warpStatus = AdminWarpStatus.fromJson(result);
+    }
+
+    _isWarpLoading = false;
+    notifyListeners();
+  }
+
+  Future<WarpConfig?> generateWarp() async {
+    _isWarpGenerating = true;
+    notifyListeners();
+
+    final result = await _apiClient.adminGenerateWarp();
+    if (result != null && result['config'] != null) {
+      final config = WarpConfig.fromJson(
+          result['config'] as Map<String, dynamic>);
+      _warpStatus = AdminWarpStatus(available: true, config: config);
+      _isWarpGenerating = false;
+      notifyListeners();
+      return config;
+    }
+
+    // Reload to get fresh state
+    await loadWarp();
+    _isWarpGenerating = false;
+    notifyListeners();
+    return null;
+  }
+
+  Future<bool> deleteWarp() async {
+    final ok = await _apiClient.adminDeleteWarp();
+    if (ok) {
+      _warpStatus = const AdminWarpStatus(available: false);
+      notifyListeners();
+    }
+    return ok;
   }
 }

@@ -69,6 +69,27 @@ class DioHttpClient implements domain.HttpClient {
   }
 
   @override
+  Future<domain.HttpResponse> delete(
+    String url, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        url,
+        options: Options(headers: headers),
+      );
+      return domain.HttpResponse(
+        statusCode: response.statusCode ?? 500,
+        data: response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : null,
+      );
+    } on DioException {
+      rethrow;
+    }
+  }
+
+  @override
   Future<domain.HttpResponse> put(
     String url, {
     Map<String, dynamic>? data,
