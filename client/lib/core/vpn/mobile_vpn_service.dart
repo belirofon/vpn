@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter_v2ray_plus/flutter_v2ray.dart';
-import '../../data/models/vpn_config.dart';
-import 'vpn_service.dart';
+import '../../domain/entities/vpn_config.dart';
+import '../../domain/services/vpn_service.dart';
 
 class MobileVpnService implements VpnService {
   final FlutterV2ray _v2ray = FlutterV2ray();

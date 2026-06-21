@@ -1,6 +1,6 @@
 import 'dart:async';
-import '../../data/models/vpn_config.dart';
-import 'vpn_service.dart';
+import '../../domain/entities/vpn_config.dart';
+import '../../domain/services/vpn_service.dart';
 
 class WebVpnService implements VpnService {
   final StreamController<VpnConnectionState> _stateController =
