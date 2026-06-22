@@ -97,12 +97,21 @@ class UpdateService {
   }
 
   /// Triggers Android package installer via FileProvider.
+  /// Returns true if the installer was launched successfully.
+  /// Throws [PlatformException] with code `PERMISSION_REQUIRED` if the user
+  /// must first grant the "Install unknown apps" permission in Settings.
   Future<bool> install(String filePath) async {
     if (kIsWeb || !Platform.isAndroid) return false;
 
     try {
-      await _channel.invokeMethod('installApk', {'path': filePath});
-      return true;
+      final result = await _channel.invokeMethod<bool>('installApk', {'path': filePath});
+      return result ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException catch (e) {
+      if (e.code == 'PERMISSION_REQUIRED') rethrow;
+      debugPrint('UpdateService.install (platform): $e');
+      return false;
     } catch (e) {
       debugPrint('UpdateService.install: $e');
       return false;

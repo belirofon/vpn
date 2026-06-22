@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/update/update_service.dart';
 import '../../data/api/api_client.dart';
 import '../../domain/entities/vpn_config.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   AppLifecycleListener? _lifecycleListener;
+  bool _updateChecked = false;
 
   @override
   void initState() {
@@ -57,6 +59,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _checkForUpdate() async {
+    if (_updateChecked) return;
+    _updateChecked = true;
+
     try {
       final result = await widget.updateService.check();
       if (result == null || !mounted) return;
@@ -950,7 +955,20 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       );
       if (!mounted) return;
       setState(() => _downloadedPath = path);
-      await widget.updateService.install(path);
+      final installed = await widget.updateService.install(path);
+      if (!installed && mounted) {
+        setState(() => _failed = true);
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'PERMISSION_REQUIRED') {
+        // User is being redirected to Settings — no error shown.
+        // Kotlin MainActivity.onResume() will retry automatically.
+        // Reset state so Retry button appears if permission is denied.
+        if (mounted) setState(() => _downloadedPath = null);
+        return;
+      }
+      debugPrint('Update install failed (platform): $e');
+      if (mounted) setState(() => _failed = true);
     } catch (e) {
       debugPrint('Update download failed: $e');
       if (mounted) setState(() => _failed = true);
