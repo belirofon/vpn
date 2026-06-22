@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"golang.org/x/crypto/curve25519"
@@ -58,6 +59,21 @@ type registrationResponse struct {
 			} `json:"addresses"`
 		} `json:"interface"`
 	} `json:"config"`
+}
+
+// ensureCIDR adds a CIDR mask (/32 for IPv4, /128 for IPv6) if addr
+// is a plain IP without one. Sing-box WireGuard endpoint requires CIDR.
+func ensureCIDR(addr string) string {
+	if _, err := netip.ParsePrefix(addr); err == nil {
+		return addr
+	}
+	if ip, err := netip.ParseAddr(addr); err == nil {
+		if ip.Is4() || ip.Is4In6() {
+			return addr + "/32"
+		}
+		return addr + "/128"
+	}
+	return addr
 }
 
 func newUUID() string {
@@ -179,8 +195,8 @@ func buildConfig(privKey []byte, reg *registrationResponse) *model.WarpConfig {
 	return &model.WarpConfig{
 		Protocol:        "warp",
 		PrivateKey:      privB64,
-		AddressV4:       reg.Config.Interface.Addresses.V4,
-		AddressV6:       reg.Config.Interface.Addresses.V6,
+		AddressV4:       ensureCIDR(reg.Config.Interface.Addresses.V4),
+		AddressV6:       ensureCIDR(reg.Config.Interface.Addresses.V6),
 		DNSServers:      warpDNS,
 		ServerPublicKey: serverPubKey,
 		Endpoint:        endpoint,
