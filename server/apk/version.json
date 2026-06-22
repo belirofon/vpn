@@ -1,6 +1,6 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.11",
   "build_number": 7,
-  "min_version": "1.0.0",
+  "min_version": "1.0.11",
   "changelog": "- WARP Cloudflare integration\n- Tab-based config selection (WARP/Proxy)\n- In-app auto-updates (hard + soft)\n- Admin panel\n- REALITY filter"
 }
