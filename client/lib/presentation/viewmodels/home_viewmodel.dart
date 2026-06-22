@@ -82,34 +82,41 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> connectToProxy(VpnConfig config) async {
+    debugPrint('[HomeViewModel] connectToProxy — ${config.id} ${config.name}');
     _errorMessage = null;
     notifyListeners();
 
     try {
       await _vpnService.connect(config);
+      debugPrint('[HomeViewModel] connectToProxy — OK, setting activeConfig');
       _activeConfig = config;
       _activeWarpConfig = null;
     } catch (e) {
+      debugPrint('[HomeViewModel] connectToProxy — ERROR: $e');
       _errorMessage = e.toString();
       notifyListeners();
     }
   }
 
   Future<void> connectToWarp(WarpConfig config) async {
+    debugPrint('[HomeViewModel] connectToWarp — ${config.endpoint}');
     _errorMessage = null;
     notifyListeners();
 
     try {
       await _vpnService.connectWarp(config);
+      debugPrint('[HomeViewModel] connectToWarp — OK, setting activeWarpConfig');
       _activeWarpConfig = config;
       _activeConfig = null;
     } catch (e) {
+      debugPrint('[HomeViewModel] connectToWarp — ERROR: $e');
       _errorMessage = e.toString();
       notifyListeners();
     }
   }
 
   Future<void> toggleConnection() async {
+    debugPrint('[HomeViewModel] toggleConnection — currentState=$_screenState');
     if (_screenState == ScreenState.connected) {
       await _vpnService.disconnect();
       return;
@@ -126,6 +133,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _onVpnStateChanged(VpnConnectionState state) {
+    debugPrint('[HomeViewModel] _onVpnStateChanged: $state');
     _screenState = _vpnStateToScreen(state);
     if (state == VpnConnectionState.disconnected) {
       _activeConfig = null;
