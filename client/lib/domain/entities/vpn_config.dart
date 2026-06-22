@@ -11,6 +11,7 @@ class VpnConfig {
   final int latencyMs;
   final String country;
   final String? rawLink;
+  final Map<String, dynamic>? singboxConfig;
 
   const VpnConfig({
     required this.id,
@@ -25,6 +26,7 @@ class VpnConfig {
     this.latencyMs = 0,
     this.country = '',
     this.rawLink,
+    this.singboxConfig,
   });
 
   @override

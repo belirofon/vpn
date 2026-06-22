@@ -15,6 +15,7 @@ class VpnConfigDto {
       latencyMs: json['latency_ms'] as int? ?? 0,
       country: json['country'] as String? ?? '',
       rawLink: json['raw_link'] as String?,
+      singboxConfig: json['singbox_config'] as Map<String, dynamic>?,
     );
   }
 
@@ -32,6 +33,7 @@ class VpnConfigDto {
       'latency_ms': config.latencyMs,
       'country': config.country,
       if (config.rawLink != null) 'raw_link': config.rawLink,
+      if (config.singboxConfig != null) 'singbox_config': config.singboxConfig,
     };
   }
 
