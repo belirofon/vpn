@@ -118,6 +118,10 @@ clean:
 	rm -f server/server
 	cd client && flutter clean
 
+# Generate Swagger/OpenAPI docs
+swagger:
+	cd server && swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+
 # Remove GeoIP database (re-downloaded on next build)
 clean-geoip:
 	rm -f $(GEOIP_FILE)

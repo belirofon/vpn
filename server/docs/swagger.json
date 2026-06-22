@@ -1,0 +1,712 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Auto-proxy subscription fetcher · latency tester · geo-filter · one-tap mobile client",
+        "title": "VPN Server \u0026 Client",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/admin/config": {
+            "get": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Returns the current runtime configuration values",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get runtime config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Update runtime configuration fields (subscription_url, refresh_interval)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update runtime config",
+                "parameters": [
+                    {
+                        "description": "Config fields to update",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/endpoints": {
+            "get": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Lists all registered API routes with methods and paths",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all endpoints",
+                "responses": {
+                    "200": {
+                        "description": "Endpoints list",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/health": {
+            "get": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Returns server health status with uptime and configuration details",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Admin server health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/login": {
+            "post": {
+                "description": "Authenticate with email and password to obtain a bearer token for subsequent admin requests",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Admin login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logout": {
+            "post": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Invalidates the current admin session token",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Admin logout",
+                "responses": {
+                    "200": {
+                        "description": "Logged out",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/refresh-configs": {
+            "post": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Triggers an asynchronous refresh of the config cache",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Refresh configs (admin)",
+                "responses": {
+                    "200": {
+                        "description": "Refreshing",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already in progress",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/warp": {
+            "get": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Returns current WARP config status (available + config details)",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get WARP status",
+                "responses": {
+                    "200": {
+                        "description": "WARP status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Clears the cached Cloudflare WARP WireGuard config",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete WARP config",
+                "responses": {
+                    "200": {
+                        "description": "Cleared",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/warp/generate": {
+            "post": {
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "description": "Force re-generates the Cloudflare WARP WireGuard config",
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Generate WARP config",
+                "responses": {
+                    "200": {
+                        "description": "Generated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Generation failed",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/app-info": {
+            "get": {
+                "description": "Returns the latest app version, minimum required version, and changelog for in-app update checks",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "App version info",
+                "responses": {
+                    "200": {
+                        "description": "Version info",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.UpdateInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Version info not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/best-config": {
+            "get": {
+                "description": "Returns the lowest-latency non-Russian proxy configuration. Returns 503 if not ready or no configs available.",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Get best config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.BestConfigResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "No available configs",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/configs": {
+            "get": {
+                "description": "Returns all tested and geo-filtered proxy configurations, sorted by latency",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "List all configs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.ConfigListResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Server not ready",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/refresh": {
+            "post": {
+                "description": "Triggers an immediate asynchronous refresh of the config cache (fetch → parse → test → geo → reality → sort)",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Refresh config cache",
+                "responses": {
+                    "200": {
+                        "description": "Refreshing started",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refresh already in progress",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status": {
+            "get": {
+                "description": "Returns the server status, number of tested configs, and the best config name/latency",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Server status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/update/download": {
+            "get": {
+                "description": "Downloads the latest Android APK for in-app update",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Download APK",
+                "responses": {
+                    "200": {
+                        "description": "APK file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "APK not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/warp-config": {
+            "get": {
+                "description": "Returns the current Cloudflare WARP WireGuard configuration if generated and WARP is enabled",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Get WARP config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.WarpConfigResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "WARP not available",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns the current server health status (loading/testing/ready/error)",
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Server health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vpn-server_internal_model.StatusResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "internal_handler.UpdateInfo": {
+            "type": "object",
+            "properties": {
+                "build_number": {
+                    "type": "integer"
+                },
+                "changelog": {
+                    "type": "string"
+                },
+                "min_version": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.BestConfigResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/vpn-server_internal_model.VpnConfig"
+                },
+                "updated": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.ConfigListResponse": {
+            "type": "object",
+            "properties": {
+                "configs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/vpn-server_internal_model.VpnConfig"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "updated": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.ServerStatus": {
+            "type": "string",
+            "enum": [
+                "loading",
+                "testing",
+                "ready",
+                "error"
+            ],
+            "x-enum-varnames": [
+                "StatusLoading",
+                "StatusTesting",
+                "StatusReady",
+                "StatusError"
+            ]
+        },
+        "vpn-server_internal_model.StatusResponse": {
+            "type": "object",
+            "properties": {
+                "best_latency_ms": {
+                    "type": "integer"
+                },
+                "best_name": {
+                    "type": "string"
+                },
+                "configs_tested": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/vpn-server_internal_model.ServerStatus"
+                },
+                "updated": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.VpnConfig": {
+            "type": "object",
+            "properties": {
+                "alpn": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "fp": {
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latency_ms": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "pbk": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "raw_link": {
+                    "type": "string"
+                },
+                "server": {
+                    "type": "string"
+                },
+                "sid": {
+                    "type": "string"
+                },
+                "sni": {
+                    "type": "string"
+                },
+                "tls": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.WarpConfig": {
+            "type": "object",
+            "properties": {
+                "address_v4": {
+                    "type": "string"
+                },
+                "address_v6": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "dns": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "latency_ms": {
+                    "type": "integer"
+                },
+                "private_key": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "server_public_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "vpn-server_internal_model.WarpConfigResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/vpn-server_internal_model.WarpConfig"
+                },
+                "updated": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "bearerAuth": {
+            "description": "Type 'Bearer \u003ctoken\u003e' to authenticate admin requests",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

@@ -1,0 +1,467 @@
+basePath: /
+definitions:
+  internal_handler.UpdateInfo:
+    properties:
+      build_number:
+        type: integer
+      changelog:
+        type: string
+      min_version:
+        type: string
+      version:
+        type: string
+    type: object
+  vpn-server_internal_model.BestConfigResponse:
+    properties:
+      config:
+        $ref: '#/definitions/vpn-server_internal_model.VpnConfig'
+      updated:
+        type: string
+    type: object
+  vpn-server_internal_model.ConfigListResponse:
+    properties:
+      configs:
+        items:
+          $ref: '#/definitions/vpn-server_internal_model.VpnConfig'
+        type: array
+      total:
+        type: integer
+      updated:
+        type: string
+    type: object
+  vpn-server_internal_model.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  vpn-server_internal_model.ServerStatus:
+    enum:
+    - loading
+    - testing
+    - ready
+    - error
+    type: string
+    x-enum-varnames:
+    - StatusLoading
+    - StatusTesting
+    - StatusReady
+    - StatusError
+  vpn-server_internal_model.StatusResponse:
+    properties:
+      best_latency_ms:
+        type: integer
+      best_name:
+        type: string
+      configs_tested:
+        type: integer
+      message:
+        type: string
+      status:
+        $ref: '#/definitions/vpn-server_internal_model.ServerStatus'
+      updated:
+        type: string
+    type: object
+  vpn-server_internal_model.VpnConfig:
+    properties:
+      alpn:
+        type: string
+      country:
+        type: string
+      fp:
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      latency_ms:
+        type: integer
+      name:
+        type: string
+      network:
+        type: string
+      password:
+        type: string
+      path:
+        type: string
+      pbk:
+        type: string
+      port:
+        type: integer
+      protocol:
+        type: string
+      raw_link:
+        type: string
+      server:
+        type: string
+      sid:
+        type: string
+      sni:
+        type: string
+      tls:
+        type: string
+      uuid:
+        type: string
+    type: object
+  vpn-server_internal_model.WarpConfig:
+    properties:
+      address_v4:
+        type: string
+      address_v6:
+        type: string
+      client_id:
+        type: string
+      dns:
+        type: string
+      endpoint:
+        type: string
+      latency_ms:
+        type: integer
+      private_key:
+        type: string
+      protocol:
+        type: string
+      server_public_key:
+        type: string
+    type: object
+  vpn-server_internal_model.WarpConfigResponse:
+    properties:
+      config:
+        $ref: '#/definitions/vpn-server_internal_model.WarpConfig'
+      updated:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Auto-proxy subscription fetcher · latency tester · geo-filter · one-tap
+    mobile client
+  title: VPN Server & Client
+  version: "1.0"
+paths:
+  /api/admin/config:
+    get:
+      description: Returns the current runtime configuration values
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Get runtime config
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Update runtime configuration fields (subscription_url, refresh_interval)
+      parameters:
+      - description: Config fields to update
+        in: body
+        name: config
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Update runtime config
+      tags:
+      - Admin
+  /api/admin/endpoints:
+    get:
+      description: Lists all registered API routes with methods and paths
+      responses:
+        "200":
+          description: Endpoints list
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - bearerAuth: []
+      summary: List all endpoints
+      tags:
+      - Admin
+  /api/admin/health:
+    get:
+      description: Returns server health status with uptime and configuration details
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Admin server health
+      tags:
+      - Admin
+  /api/admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password to obtain a bearer token for
+        subsequent admin requests
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Admin login
+      tags:
+      - Admin
+  /api/admin/logout:
+    post:
+      description: Invalidates the current admin session token
+      responses:
+        "200":
+          description: Logged out
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Admin logout
+      tags:
+      - Admin
+  /api/admin/refresh-configs:
+    post:
+      description: Triggers an asynchronous refresh of the config cache
+      responses:
+        "200":
+          description: Refreshing
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Already in progress
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.StatusResponse'
+      security:
+      - bearerAuth: []
+      summary: Refresh configs (admin)
+      tags:
+      - Admin
+  /api/admin/warp:
+    delete:
+      description: Clears the cached Cloudflare WARP WireGuard config
+      responses:
+        "200":
+          description: Cleared
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Delete WARP config
+      tags:
+      - Admin
+    get:
+      description: Returns current WARP config status (available + config details)
+      responses:
+        "200":
+          description: WARP status
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Get WARP status
+      tags:
+      - Admin
+  /api/admin/warp/generate:
+    post:
+      description: Force re-generates the Cloudflare WARP WireGuard config
+      responses:
+        "200":
+          description: Generated
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Generation failed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - bearerAuth: []
+      summary: Generate WARP config
+      tags:
+      - Admin
+  /api/app-info:
+    get:
+      description: Returns the latest app version, minimum required version, and changelog
+        for in-app update checks
+      responses:
+        "200":
+          description: Version info
+          schema:
+            $ref: '#/definitions/internal_handler.UpdateInfo'
+        "404":
+          description: Version info not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: App version info
+      tags:
+      - Public
+  /api/best-config:
+    get:
+      description: Returns the lowest-latency non-Russian proxy configuration. Returns
+        503 if not ready or no configs available.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.BestConfigResponse'
+        "503":
+          description: No available configs
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.ErrorResponse'
+      summary: Get best config
+      tags:
+      - Public
+  /api/configs:
+    get:
+      description: Returns all tested and geo-filtered proxy configurations, sorted
+        by latency
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.ConfigListResponse'
+        "503":
+          description: Server not ready
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.StatusResponse'
+      summary: List all configs
+      tags:
+      - Public
+  /api/refresh:
+    post:
+      description: Triggers an immediate asynchronous refresh of the config cache
+        (fetch → parse → test → geo → reality → sort)
+      responses:
+        "200":
+          description: Refreshing started
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Refresh already in progress
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.StatusResponse'
+      summary: Refresh config cache
+      tags:
+      - Public
+  /api/status:
+    get:
+      description: Returns the server status, number of tested configs, and the best
+        config name/latency
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.StatusResponse'
+      summary: Server status
+      tags:
+      - Public
+  /api/update/download:
+    get:
+      description: Downloads the latest Android APK for in-app update
+      responses:
+        "200":
+          description: APK file
+          schema:
+            type: file
+        "404":
+          description: APK not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Download APK
+      tags:
+      - Public
+  /api/warp-config:
+    get:
+      description: Returns the current Cloudflare WARP WireGuard configuration if
+        generated and WARP is enabled
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.WarpConfigResponse'
+        "404":
+          description: WARP not available
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.ErrorResponse'
+      summary: Get WARP config
+      tags:
+      - Public
+  /health:
+    get:
+      description: Returns the current server health status (loading/testing/ready/error)
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vpn-server_internal_model.StatusResponse'
+      summary: Server health check
+      tags:
+      - Public
+schemes:
+- http
+- https
+securityDefinitions:
+  bearerAuth:
+    description: Type 'Bearer <token>' to authenticate admin requests
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

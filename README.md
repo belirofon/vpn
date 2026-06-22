@@ -498,7 +498,7 @@ vpn/
 │   │   ├── main.dart                # App entry point
 │   │   ├── core/vpn/                # VPN service abstraction
 │   │   │   ├── vpn_service.dart     # Abstract interface
-│   │   │   ├── mobile_vpn_service.dart  # V2Ray-based mobile VPN
+│   │   │   ├── mobile_vpn_service.dart  # Sing-box-based mobile VPN
 │   │   │   └── web_vpn_service.dart     # Web mock (UI testing)
 │   │   ├── data/
 │   │   │   ├── api/api_client.dart  # HTTP API client (Dio)

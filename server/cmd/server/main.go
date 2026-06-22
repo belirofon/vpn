@@ -1,3 +1,25 @@
+// Package main VPN Server & Client
+//
+// Auto-proxy subscription fetcher · latency tester · geo-filter · one-tap mobile client.
+//
+//	@title          VPN Server & Client
+//	@version        1.0
+//	@description    Auto-proxy subscription fetcher · latency tester · geo-filter · one-tap mobile client
+//	@host           localhost:8080
+//	@BasePath       /
+//	@schemes        http https
+//
+//	@securityDefinitions.apikey  bearerAuth
+//	@in                          header
+//	@name                        Authorization
+//	@description                 Type 'Bearer <token>' to authenticate admin requests
+//
+//	@tag.name         Public
+//	@tag.description  Public endpoints for VPN configuration
+//	@tag.name         Admin
+//	@tag.description  Authenticated admin management endpoints
+//
+// swagger:meta
 package main
 
 import (
@@ -10,10 +32,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"vpn-server/internal/cache"
 	"vpn-server/internal/config"
 	"vpn-server/internal/geo"
 	"vpn-server/internal/handler"
+	_ "vpn-server/docs"
 )
 
 func main() {
@@ -48,6 +73,8 @@ func main() {
 
 	handler.SetupRoutes(r, c)
 	handler.SetupUpdateRoutes(r)
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,

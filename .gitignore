@@ -5,6 +5,9 @@
 server/server
 server/vpn-server
 
+# Swagger generated docs — committed to repo for Docker builds
+# Regenerate via: make swagger
+
 # GeoIP database (auto-downloaded by make build-server)
 server/GeoLite2-Country.mmdb
 

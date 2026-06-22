@@ -40,37 +40,50 @@ func readVersionFile() (*UpdateInfo, error) {
 	return &info, nil
 }
 
-// SetupUpdateRoutes registers app update endpoints.
-//
-//	GET /api/app-info        → version check (min_version for force update)
-//	GET /api/update/download → APK download
+// AppInfo returns the latest app version information for in-app update checks.
+// @Summary      App version info
+// @Description  Returns the latest app version, minimum required version, and changelog for in-app update checks
+// @Tags         Public
+// @Success      200 {object} handler.UpdateInfo "Version info"
+// @Failure      404 {object} map[string]string "Version info not found"
+// @Router       /api/app-info [get]
+func AppInfo(c *gin.Context) {
+	info, err := readVersionFile()
+	if err != nil {
+		slog.Warn("version.json not found", "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "update_not_available",
+			"message": "Version info not found",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, info)
+}
+
+// DownloadApk serves the Android APK file for download.
+// @Summary      Download APK
+// @Description  Downloads the latest Android APK for in-app update
+// @Tags         Public
+// @Success      200 {file} binary "APK file"
+// @Failure      404 {object} map[string]string "APK not found"
+// @Router       /api/update/download [get]
+func DownloadApk(c *gin.Context) {
+	apkPath := filepath.Join(apkDir, "vpn-client-android.apk")
+	if _, err := os.Stat(apkPath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "file_not_found",
+			"message": "APK file not found",
+		})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=vpn-client-android.apk")
+	c.File(apkPath)
+}
+
 func SetupUpdateRoutes(r *gin.Engine) {
 	api := r.Group("/api")
 	{
-		api.GET("/app-info", func(c *gin.Context) {
-			info, err := readVersionFile()
-			if err != nil {
-				slog.Warn("version.json not found", "error", err)
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "update_not_available",
-					"message": "Version info not found",
-				})
-				return
-			}
-			c.JSON(http.StatusOK, info)
-		})
-
-		api.GET("/update/download", func(c *gin.Context) {
-			apkPath := filepath.Join(apkDir, "vpn-client-android.apk")
-			if _, err := os.Stat(apkPath); os.IsNotExist(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "file_not_found",
-					"message": "APK file not found",
-				})
-				return
-			}
-			c.Header("Content-Disposition", "attachment; filename=vpn-client-android.apk")
-			c.File(apkPath)
-		})
+		api.GET("/app-info", AppInfo)
+		api.GET("/update/download", DownloadApk)
 	}
 }

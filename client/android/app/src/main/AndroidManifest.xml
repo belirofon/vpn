@@ -15,9 +15,9 @@
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true">
         
-        <!-- VPN Service for flutter_v2ray_plus -->
+        <!-- VPN Service for flutter_singbox_client -->
         <service
-            android:name="com.tester.flutter_v2ray_plus.FlutterV2rayService"
+            android:name="com.amirzr.flutter_singbox_client.FlutterSingboxClientService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
