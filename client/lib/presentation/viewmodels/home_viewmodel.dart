@@ -5,7 +5,7 @@ import '../../domain/entities/vpn_config.dart';
 import '../../domain/entities/warp_config.dart';
 import '../../domain/services/vpn_service.dart';
 
-enum HomeMode { warp, proxy }
+enum HomeMode { warp, proxy, best }
 
 enum ScreenState { disconnected, connecting, connected, error }
 
@@ -21,6 +21,7 @@ class HomeViewModel extends ChangeNotifier {
   HomeMode _selectedMode = HomeMode.proxy;
 
   List<VpnConfig> _proxyConfigs = [];
+  List<VpnConfig> _bestConfigs = [];
   WarpConfig? _warpConfig;
   bool _isLoadingConfigs = false;
 
@@ -49,6 +50,7 @@ class HomeViewModel extends ChangeNotifier {
   HomeMode get selectedMode => _selectedMode;
 
   List<VpnConfig> get proxyConfigs => _proxyConfigs;
+  List<VpnConfig> get bestConfigs => _bestConfigs;
   WarpConfig? get warpConfig => _warpConfig;
   bool get isLoadingConfigs => _isLoadingConfigs;
 
@@ -68,10 +70,16 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_selectedMode == HomeMode.proxy) {
-        _proxyConfigs = await _apiClient.getConfigs();
-      } else {
-        _warpConfig = await _apiClient.getWarpConfig();
+      switch (_selectedMode) {
+        case HomeMode.proxy:
+          _proxyConfigs = await _apiClient.getConfigs();
+          break;
+        case HomeMode.warp:
+          _warpConfig = await _apiClient.getWarpConfig();
+          break;
+        case HomeMode.best:
+          _bestConfigs = await _apiClient.getBestConfigs();
+          break;
       }
     } catch (e) {
       debugPrint('HomeViewModel.loadConfigs error: $e');

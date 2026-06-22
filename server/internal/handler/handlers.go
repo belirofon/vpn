@@ -8,6 +8,20 @@ import (
 	"vpn-server/internal/model"
 )
 
+// GetBestConfigs returns all admin-scanned best configs.
+// @Summary      Get best configs
+// @Description  Returns all admin-scanned (best) proxy configurations
+// @Tags         Public
+// @Success      200 {object} model.BestConfigListResponse
+// @Router       /api/best-configs [get]
+func GetBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
+	configs := cc.GetBestConfigs()
+	c.JSON(http.StatusOK, model.BestConfigListResponse{
+		Configs: configs,
+		Total:   len(configs),
+	})
+}
+
 // Health returns the server health status.
 // @Summary      Server health check
 // @Description  Returns the current server health status (loading/testing/ready/error)
@@ -171,6 +185,10 @@ func SetupRoutes(r *gin.Engine, c *cache.ConfigCache) {
 
 		api.POST("/refresh", func(ctx *gin.Context) {
 			PostRefresh(ctx, c)
+		})
+
+		api.GET("/best-configs", func(ctx *gin.Context) {
+			GetBestConfigs(ctx, c)
 		})
 	}
 

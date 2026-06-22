@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   dio: ^5.4.0
   flutter_singbox_client: ^1.0.1
+  mobile_scanner: ^6.0.0
   package_info_plus: ^8.0.0
   path_provider: ^2.1.2
   pub_semver: ^2.1.4

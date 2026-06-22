@@ -15,18 +15,19 @@ import (
 
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
-	mu         sync.RWMutex
-	cfg        config.Config
-	status     model.ServerStatus
-	statusMsg  string
-	configs    []model.VpnConfig
-	warpConfig *model.WarpConfig
-	updated    time.Time
-	startedAt  time.Time
-	pl         *pipeline.Pipeline
-	ticker     *time.Ticker
-	stopCh     chan struct{}
-	logger     *slog.Logger
+	mu          sync.RWMutex
+	cfg         config.Config
+	status      model.ServerStatus
+	statusMsg   string
+	configs     []model.VpnConfig
+	bestConfigs []model.VpnConfig
+	warpConfig  *model.WarpConfig
+	updated     time.Time
+	startedAt   time.Time
+	pl          *pipeline.Pipeline
+	ticker      *time.Ticker
+	stopCh      chan struct{}
+	logger      *slog.Logger
 }
 
 // NewCache creates a new ConfigCache.
@@ -91,6 +92,37 @@ func (cc *ConfigCache) GetBestConfig() *model.VpnConfig {
 	}
 	best := cc.configs[0]
 	return &best
+}
+
+// GetBestConfigs returns a copy of all admin-scanned best configs.
+func (cc *ConfigCache) GetBestConfigs() []model.VpnConfig {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+
+	result := make([]model.VpnConfig, len(cc.bestConfigs))
+	copy(result, cc.bestConfigs)
+	return result
+}
+
+// AddBestConfig appends a config to the admin-scanned best configs list.
+func (cc *ConfigCache) AddBestConfig(cfg model.VpnConfig) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	cc.bestConfigs = append(cc.bestConfigs, cfg)
+	cc.logger.Info("best config added",
+		"name", cfg.Name,
+		"server", cfg.Server,
+	)
+}
+
+// ClearBestConfigs removes all admin-scanned best configs.
+func (cc *ConfigCache) ClearBestConfigs() {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	cc.bestConfigs = nil
+	cc.logger.Info("best configs cleared")
 }
 
 // GetUpdated returns the last update timestamp as RFC3339.

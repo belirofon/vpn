@@ -116,6 +116,55 @@ class ApiClient {
     }
   }
 
+  // -- Best Configs API methods --
+
+  Future<List<VpnConfig>> getBestConfigs() async {
+    try {
+      final response = await _http.get('/api/best-configs');
+      if (response.statusCode == 200 && response.data?['configs'] is List) {
+        final list = response.data!['configs'] as List;
+        return list
+            .map((e) => VpnConfigDto.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('ApiClient.getBestConfigs error: $e');
+      return [];
+    }
+  }
+
+  /// Fetches a URL and returns the JSON body, or null on failure.
+  Future<Map<String, dynamic>?> fetchJson(String url) async {
+    try {
+      final response = await _http.get(url);
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.fetchJson error: $e');
+      return null;
+    }
+  }
+
+  Future<bool> adminPostBestConfig(Map<String, dynamic> config) async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return false;
+
+    try {
+      final response = await _http.post(
+        '/api/admin/best-configs',
+        data: config,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminPostBestConfig error: $e');
+      return false;
+    }
+  }
+
   // -- Admin API methods --
 
   Future<String?> adminLogin(String email, String password) async {

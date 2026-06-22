@@ -210,10 +210,12 @@ class _HomeScreenState extends State<HomeScreen>
                             child: _ConfigList(
                               mode: vm.selectedMode,
                               proxyConfigs: vm.proxyConfigs,
+                              bestConfigs: vm.bestConfigs,
                               warpConfig: vm.warpConfig,
                               isLoading: vm.isLoadingConfigs,
                               isConnecting: vm.isLoading,
                               onProxyTap: vm.connectToProxy,
+                              onBestTap: vm.connectToProxy,
                               onWarpTap: () => vm.connectToWarp(vm.warpConfig!),
                             ),
                           ),
@@ -331,19 +333,23 @@ class _ConnectedBody extends StatelessWidget {
 class _ConfigList extends StatelessWidget {
   final HomeMode mode;
   final List<VpnConfig> proxyConfigs;
+  final List<VpnConfig> bestConfigs;
   final WarpConfig? warpConfig;
   final bool isLoading;
   final bool isConnecting;
   final void Function(VpnConfig) onProxyTap;
+  final void Function(VpnConfig) onBestTap;
   final VoidCallback onWarpTap;
 
   const _ConfigList({
     required this.mode,
     required this.proxyConfigs,
+    required this.bestConfigs,
     required this.warpConfig,
     required this.isLoading,
     required this.isConnecting,
     required this.onProxyTap,
+    required this.onBestTap,
     required this.onWarpTap,
   });
 
@@ -353,30 +359,64 @@ class _ConfigList extends StatelessWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (mode == HomeMode.proxy) {
-      if (proxyConfigs.isEmpty) {
-        return Center(
-          child: Text(
-            'No proxy configs available',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-          ),
-        );
-      }
+    switch (mode) {
+      case HomeMode.proxy:
+        return _buildProxyList(context);
+      case HomeMode.best:
+        return _buildBestList(context);
+      case HomeMode.warp:
+        return _buildWarpList(context);
+    }
+  }
 
-      return ListView.separated(
-        itemCount: proxyConfigs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final config = proxyConfigs[index];
-          return _ProxyConfigTile(
-            config: config,
-            onTap: () => onProxyTap(config),
-          );
-        },
+  Widget _buildBestList(BuildContext context) {
+    if (bestConfigs.isEmpty) {
+      return Center(
+        child: Text(
+          'No best configs available.\nAsk the admin to scan one!',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+        ),
       );
     }
 
-    // WARP mode
+    return ListView.separated(
+      itemCount: bestConfigs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final config = bestConfigs[index];
+        return _ProxyConfigTile(
+          config: config,
+          onTap: () => onBestTap(config),
+        );
+      },
+    );
+  }
+
+  Widget _buildProxyList(BuildContext context) {
+    if (proxyConfigs.isEmpty) {
+      return Center(
+        child: Text(
+          'No proxy configs available',
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: proxyConfigs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final config = proxyConfigs[index];
+        return _ProxyConfigTile(
+          config: config,
+          onTap: () => onProxyTap(config),
+        );
+      },
+    );
+  }
+
+  Widget _buildWarpList(BuildContext context) {
     if (warpConfig == null) {
       return Center(
         child: Text(
@@ -653,7 +693,7 @@ class _ModeSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: MediaQuery.of(context).size.width * 0.8,
+      width: MediaQuery.of(context).size.width * 0.9,
       height: 48,
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
@@ -672,6 +712,12 @@ class _ModeSwitch extends StatelessWidget {
             icon: Icons.shield_outlined,
             isSelected: selectedMode == HomeMode.proxy,
             onTap: () => onChanged(HomeMode.proxy),
+          )),
+          Expanded(child: _ModeOption(
+            label: 'Best',
+            icon: Icons.star,
+            isSelected: selectedMode == HomeMode.best,
+            onTap: () => onChanged(HomeMode.best),
           )),
         ],
       ),

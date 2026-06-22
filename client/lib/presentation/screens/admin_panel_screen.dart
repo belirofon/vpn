@@ -5,6 +5,7 @@ import '../../data/api/api_client.dart';
 import '../../data/dto/admin_models.dart';
 import '../../domain/entities/warp_config.dart';
 import '../viewmodels/admin_viewmodel.dart';
+import 'qr_scanner_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -183,7 +184,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   int _sectionCount() {
-    int count = 4; // health, config, endpoints, warp
+    int count = 5; // health, config, endpoints, warp, qr scan
     if (_viewModel.config != null) count++;
     return count;
   }
@@ -215,6 +216,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           onDelete: _deleteWarp,
         );
       case 4:
+        return _BestConfigsScanSection(
+          isScanning: _viewModel.isScanning,
+          scanResult: _viewModel.scanResult,
+          onScan: _scanQr,
+        );
+      case 5:
         if (_viewModel.config != null) {
           return _ServerSettingsSection(
             config: _viewModel.config!,
@@ -225,6 +232,26 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Future<void> _scanQr() async {
+    final scanned = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (scanned == null || scanned.isEmpty) return;
+
+    final result = await _viewModel.processScannedText(scanned);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: result.startsWith('Error') || result.contains('Failed')
+            ? Theme.of(context).colorScheme.error
+            : Colors.green,
+      ),
+    );
   }
 }
 
@@ -409,6 +436,79 @@ class _EndpointsSection extends StatelessWidget {
           else
             const Text('No endpoint data',
                 style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+}
+
+// -- Best Configs Scan Section --
+
+class _BestConfigsScanSection extends StatelessWidget {
+  final bool isScanning;
+  final String scanResult;
+  final VoidCallback onScan;
+
+  const _BestConfigsScanSection({
+    required this.isScanning,
+    required this.scanResult,
+    required this.onScan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _SectionCard(
+        icon: Icons.qr_code_scanner,
+        title: 'Best Configs Scanner',
+        children: [
+          const Text(
+            'Scan a QR code with a VPN config URL, JSON, or proxy link to make it available for all clients in the "Best" tab.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: isScanning ? null : onScan,
+              icon: isScanning
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.qr_code_scanner, size: 20),
+              label: Text(isScanning ? 'Processing…' : 'Scan QR Code'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          if (scanResult.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: scanResult.startsWith('Error') || scanResult.contains('Failed')
+                    ? theme.colorScheme.errorContainer
+                    : Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                scanResult,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scanResult.startsWith('Error') || scanResult.contains('Failed')
+                      ? theme.colorScheme.onErrorContainer
+                      : Colors.green.shade800,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

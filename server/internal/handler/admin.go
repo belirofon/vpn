@@ -271,6 +271,70 @@ func AdminGenerateWarp(c *gin.Context, cc *cache.ConfigCache) {
 	})
 }
 
+// AdminPostBestConfig receives a scanned config and adds it to the best configs list.
+func AdminPostBestConfig(c *gin.Context, cc *cache.ConfigCache) {
+	var req struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Server   string `json:"server"`
+		Port     int    `json:"port"`
+		Protocol string `json:"protocol"`
+		UUID     string `json:"uuid,omitempty"`
+		Password string `json:"password,omitempty"`
+		TLS      string `json:"tls,omitempty"`
+		Network  string `json:"network,omitempty"`
+		RawLink  string `json:"raw_link,omitempty"`
+		Country  string `json:"country,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
+		return
+	}
+
+	cfg := model.VpnConfig{
+		ID:       req.ID,
+		Name:     req.Name,
+		Server:   req.Server,
+		Port:     req.Port,
+		Protocol: req.Protocol,
+		UUID:     req.UUID,
+		Password: req.Password,
+		TLS:      req.TLS,
+		Network:  req.Network,
+		RawLink:  req.RawLink,
+		Country:  req.Country,
+	}
+	if cfg.ID == "" {
+		cfg.ID = cfg.Server + ":" + itoa(cfg.Port)
+	}
+	if cfg.Name == "" {
+		cfg.Name = cfg.Server
+	}
+
+	cc.AddBestConfig(cfg)
+	c.JSON(http.StatusOK, gin.H{"status": "added", "config": cfg})
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(buf[i:])
+}
+
+// AdminDeleteBestConfigs clears all best configs.
+func AdminDeleteBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
+	cc.ClearBestConfigs()
+	c.JSON(http.StatusOK, gin.H{"status": "cleared"})
+}
+
 // AdminDeleteWarp clears the cached Cloudflare WARP config.
 // @Summary      Delete WARP config
 // @Description  Clears the cached Cloudflare WARP WireGuard config
@@ -326,6 +390,14 @@ func SetupAdminRoutes(r *gin.Engine, cc *cache.ConfigCache) {
 
 		admin.DELETE("/warp", func(c *gin.Context) {
 			AdminDeleteWarp(c, cc)
+		})
+
+		admin.POST("/best-configs", func(c *gin.Context) {
+			AdminPostBestConfig(c, cc)
+		})
+
+		admin.DELETE("/best-configs", func(c *gin.Context) {
+			AdminDeleteBestConfigs(c, cc)
 		})
 	}
 }

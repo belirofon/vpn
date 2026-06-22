@@ -79,4 +79,9 @@ type WarpConfigResponse struct {
 	Updated string      `json:"updated"`
 }
 
+type BestConfigListResponse struct {
+	Configs []VpnConfig `json:"configs"`
+	Total   int         `json:"total"`
+}
+
 const ErrNoAvailableConfigs = "no_available_configs"
