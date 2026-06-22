@@ -34,11 +34,11 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "vpn-server/docs"
 	"vpn-server/internal/cache"
 	"vpn-server/internal/config"
 	"vpn-server/internal/geo"
 	"vpn-server/internal/handler"
-	_ "vpn-server/docs"
 )
 
 func main() {
