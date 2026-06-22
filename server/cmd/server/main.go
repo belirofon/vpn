@@ -5,7 +5,6 @@
 //	@title          VPN Server & Client
 //	@version        1.0
 //	@description    Auto-proxy subscription fetcher · latency tester · geo-filter · one-tap mobile client
-//	@host           localhost:8080
 //	@BasePath       /
 //	@schemes        http https
 //
@@ -34,7 +33,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "vpn-server/docs"
+	docs "vpn-server/docs"
 	"vpn-server/internal/cache"
 	"vpn-server/internal/config"
 	"vpn-server/internal/geo"
@@ -74,6 +73,8 @@ func main() {
 	handler.SetupRoutes(r, c)
 	handler.SetupUpdateRoutes(r)
 
+	// Swagger: use empty host so UI defaults to the page's origin
+	docs.SwaggerInfo.Host = ""
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	srv := &http.Server{

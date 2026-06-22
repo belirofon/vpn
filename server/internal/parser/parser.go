@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"vpn-server/internal/model"
+	"vpn-server/internal/singbox"
 )
 
 // ParseSubscription parses raw subscription data and returns config links.
@@ -106,6 +107,8 @@ func ParseConfigLink(link string) *model.VpnConfig {
 	if cfg.Name == "" {
 		cfg.Name = cfg.Server
 	}
+
+	cfg.SingboxConfig = singbox.GenerateOutbound(cfg)
 
 	return cfg
 }

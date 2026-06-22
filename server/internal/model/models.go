@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 // ServerStatus represents the current state of the config cache.
 type ServerStatus string
 
@@ -28,9 +30,10 @@ type VpnConfig struct {
 	ALPN      string `json:"alpn,omitempty"`
 	Pbk       string `json:"pbk,omitempty"`
 	Sid       string `json:"sid,omitempty"`
-	LatencyMs int64  `json:"latency_ms"`
-	Country   string `json:"country"`
-	RawLink   string `json:"raw_link,omitempty"`
+	LatencyMs     int64            `json:"latency_ms"`
+	Country       string           `json:"country"`
+	RawLink       string           `json:"raw_link,omitempty"`
+	SingboxConfig *json.RawMessage `json:"singbox_config,omitempty"`
 }
 
 type ConfigListResponse struct {
