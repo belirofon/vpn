@@ -14,22 +14,22 @@ const (
 
 // VpnConfig represents a parsed and tested VPN configuration.
 type VpnConfig struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Server    string `json:"server"`
-	Port      int    `json:"port"`
-	Protocol  string `json:"protocol"`
-	UUID      string `json:"uuid,omitempty"`
-	Password  string `json:"password,omitempty"`
-	TLS       string `json:"tls,omitempty"`
-	Network   string `json:"network,omitempty"`
-	Host      string `json:"host,omitempty"`
-	Path      string `json:"path,omitempty"`
-	SNI       string `json:"sni,omitempty"`
-	FP        string `json:"fp,omitempty"`
-	ALPN      string `json:"alpn,omitempty"`
-	Pbk       string `json:"pbk,omitempty"`
-	Sid       string `json:"sid,omitempty"`
+	ID            string           `json:"id"`
+	Name          string           `json:"name"`
+	Server        string           `json:"server"`
+	Port          int              `json:"port"`
+	Protocol      string           `json:"protocol"`
+	UUID          string           `json:"uuid,omitempty"`
+	Password      string           `json:"password,omitempty"`
+	TLS           string           `json:"tls,omitempty"`
+	Network       string           `json:"network,omitempty"`
+	Host          string           `json:"host,omitempty"`
+	Path          string           `json:"path,omitempty"`
+	SNI           string           `json:"sni,omitempty"`
+	FP            string           `json:"fp,omitempty"`
+	ALPN          string           `json:"alpn,omitempty"`
+	Pbk           string           `json:"pbk,omitempty"`
+	Sid           string           `json:"sid,omitempty"`
 	LatencyMs     int64            `json:"latency_ms"`
 	Country       string           `json:"country"`
 	RawLink       string           `json:"raw_link,omitempty"`
