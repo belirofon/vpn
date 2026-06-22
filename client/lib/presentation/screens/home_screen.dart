@@ -72,7 +72,8 @@ class _HomeScreenState extends State<HomeScreen>
         _showSoftUpdateDialog(result.info);
       }
     } catch (_) {
-      // Network error — skip silently, app works offline.
+      // Network error — reset flag so onResume can retry.
+      _updateChecked = false;
     }
   }
 
@@ -175,13 +176,48 @@ class _HomeScreenState extends State<HomeScreen>
                     )
                   else
                     Expanded(
-                      child: _ConfigList(
-                        mode: vm.selectedMode,
-                        proxyConfigs: vm.proxyConfigs,
-                        warpConfig: vm.warpConfig,
-                        isLoading: vm.isLoadingConfigs,
-                        onProxyTap: vm.connectToProxy,
-                        onWarpTap: () => vm.connectToWarp(vm.warpConfig!),
+                      child: Column(
+                        children: [
+                          if (vm.errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_rounded,
+                                        color: theme.colorScheme.onErrorContainer,
+                                        size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        vm.errorMessage!,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onErrorContainer,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            child: _ConfigList(
+                              mode: vm.selectedMode,
+                              proxyConfigs: vm.proxyConfigs,
+                              warpConfig: vm.warpConfig,
+                              isLoading: vm.isLoadingConfigs,
+                              isConnecting: vm.isLoading,
+                              onProxyTap: vm.connectToProxy,
+                              onWarpTap: () => vm.connectToWarp(vm.warpConfig!),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -297,6 +333,7 @@ class _ConfigList extends StatelessWidget {
   final List<VpnConfig> proxyConfigs;
   final WarpConfig? warpConfig;
   final bool isLoading;
+  final bool isConnecting;
   final void Function(VpnConfig) onProxyTap;
   final VoidCallback onWarpTap;
 
@@ -305,6 +342,7 @@ class _ConfigList extends StatelessWidget {
     required this.proxyConfigs,
     required this.warpConfig,
     required this.isLoading,
+    required this.isConnecting,
     required this.onProxyTap,
     required this.onWarpTap,
   });
@@ -346,6 +384,10 @@ class _ConfigList extends StatelessWidget {
           style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
         ),
       );
+    }
+
+    if (isConnecting) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Center(

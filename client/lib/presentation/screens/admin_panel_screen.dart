@@ -449,9 +449,17 @@ class _ServerSettingsSection extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () async {
                   final uri = Uri.parse('$serverUrl/swagger/index.html');
-                  if (await canLaunchUrl(uri)) {
+                  try {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not open: $uri'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   }
                 },
                 icon: const Icon(Icons.api, size: 18),
