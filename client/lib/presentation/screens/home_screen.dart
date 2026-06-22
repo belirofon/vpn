@@ -181,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen>
                         warpConfig: vm.warpConfig,
                         isLoading: vm.isLoadingConfigs,
                         onProxyTap: vm.connectToProxy,
+                        onWarpTap: () => vm.connectToWarp(vm.warpConfig!),
                       ),
                     ),
                 ],
@@ -249,7 +250,9 @@ class _ConnectedBody extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         if (vm.activeConfig != null)
-          _ServerInfoCard(config: vm.activeConfig!),
+          _ServerInfoCard(config: vm.activeConfig!)
+        else if (vm.activeWarpConfig != null)
+          _WarpInfoCard(config: vm.activeWarpConfig!),
         if (vm.errorMessage != null) ...[
           const SizedBox(height: 16),
           Container(
@@ -295,6 +298,7 @@ class _ConfigList extends StatelessWidget {
   final WarpConfig? warpConfig;
   final bool isLoading;
   final void Function(VpnConfig) onProxyTap;
+  final VoidCallback onWarpTap;
 
   const _ConfigList({
     required this.mode,
@@ -302,6 +306,7 @@ class _ConfigList extends StatelessWidget {
     required this.warpConfig,
     required this.isLoading,
     required this.onProxyTap,
+    required this.onWarpTap,
   });
 
   @override
@@ -344,7 +349,7 @@ class _ConfigList extends StatelessWidget {
     }
 
     return Center(
-      child: _WarpConfigCard(config: warpConfig!),
+      child: _WarpConfigCard(config: warpConfig!, onConnect: onWarpTap),
     );
   }
 }
@@ -462,8 +467,9 @@ class _ProxyConfigTile extends StatelessWidget {
 
 class _WarpConfigCard extends StatelessWidget {
   final WarpConfig config;
+  final VoidCallback onConnect;
 
-  const _WarpConfigCard({required this.config});
+  const _WarpConfigCard({required this.config, required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
@@ -546,16 +552,7 @@ class _WarpConfigCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'WARP connection not yet supported on mobile',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
+                onPressed: onConnect,
                 icon: const Icon(Icons.bolt, size: 18),
                 label: const Text('Connect WARP'),
                 style: OutlinedButton.styleFrom(
@@ -778,6 +775,62 @@ class _ServerInfoCard extends StatelessWidget {
             const SizedBox(width: 4),
             Text(
               '(${config.country})',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+            const Spacer(),
+            Icon(Icons.speed, size: 18, color: latencyColor),
+            const SizedBox(width: 4),
+            Text(
+              '${config.latencyMs}ms',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: latencyColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -- WARP Info Card (shown when connected via WARP) --
+
+class _WarpInfoCard extends StatelessWidget {
+  final WarpConfig config;
+
+  const _WarpInfoCard({required this.config});
+
+  @override
+  Widget build(BuildContext context) {
+    final latencyColor = config.latencyMs < 60
+        ? Colors.green
+        : config.latencyMs < 120
+            ? Colors.orange
+            : Colors.red;
+
+    final displayName = config.clientId != null && config.clientId!.isNotEmpty
+        ? 'WARP ${config.clientId}'
+        : 'Cloudflare WARP';
+
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(Icons.bolt, size: 18, color: Colors.cyan.shade600),
+            const SizedBox(width: 8),
+            Text(
+              displayName,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              config.endpoint,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const Spacer(),

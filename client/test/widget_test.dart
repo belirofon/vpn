@@ -27,6 +27,13 @@ class MockVpnService implements VpnService {
   }
 
   @override
+  Future<void> connectWarp(WarpConfig config) async {
+    _setState(VpnConnectionState.connecting);
+    await Future.delayed(const Duration(milliseconds: 100));
+    _setState(VpnConnectionState.connected);
+  }
+
+  @override
   Future<void> disconnect() async {
     _setState(VpnConnectionState.disconnected);
   }

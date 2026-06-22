@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/api/api_client.dart';
 import '../../data/dto/admin_models.dart';
 import '../../domain/entities/warp_config.dart';
@@ -214,7 +216,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         );
       case 4:
         if (_viewModel.config != null) {
-          return _ServerSettingsSection(config: _viewModel.config!);
+          return _ServerSettingsSection(
+            config: _viewModel.config!,
+            serverUrl: widget.apiClient.serverUrl,
+          );
         }
         return const SizedBox.shrink();
       default:
@@ -414,17 +419,22 @@ class _EndpointsSection extends StatelessWidget {
 
 class _ServerSettingsSection extends StatelessWidget {
   final AdminConfig config;
+  final String? serverUrl;
 
-  const _ServerSettingsSection({required this.config});
+  const _ServerSettingsSection({required this.config, this.serverUrl});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: _SectionCard(
         icon: Icons.info_outline,
         title: 'Server Settings',
         children: [
+          _InfoRow(label: 'Subscription URL', value: config.subscriptionUrl),
+          _InfoRow(
+              label: 'Refresh Interval', value: config.refreshInterval),
           _InfoRow(label: 'Ping Timeout', value: config.pingTimeout),
           _InfoRow(label: 'Mock Configs',
               value: config.mockConfigs.toString()),
@@ -432,6 +442,26 @@ class _ServerSettingsSection extends StatelessWidget {
               value: config.skipVerifyTls.toString()),
           _InfoRow(
               label: 'CORS Origins', value: config.corsOrigins),
+          if (serverUrl != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse('$serverUrl/swagger/index.html');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.api, size: 18),
+                label: const Text('Open Swagger UI'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

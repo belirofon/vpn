@@ -16,6 +16,7 @@ class HomeViewModel extends ChangeNotifier {
 
   ScreenState _screenState = ScreenState.disconnected;
   VpnConfig? _activeConfig;
+  WarpConfig? _activeWarpConfig;
   String? _errorMessage;
   HomeMode _selectedMode = HomeMode.proxy;
 
@@ -43,6 +44,7 @@ class HomeViewModel extends ChangeNotifier {
 
   ScreenState get screenState => _screenState;
   VpnConfig? get activeConfig => _activeConfig;
+  WarpConfig? get activeWarpConfig => _activeWarpConfig;
   String? get errorMessage => _errorMessage;
   HomeMode get selectedMode => _selectedMode;
 
@@ -86,6 +88,21 @@ class HomeViewModel extends ChangeNotifier {
     try {
       await _vpnService.connect(config);
       _activeConfig = config;
+      _activeWarpConfig = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> connectToWarp(WarpConfig config) async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _vpnService.connectWarp(config);
+      _activeWarpConfig = config;
+      _activeConfig = null;
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
@@ -112,6 +129,7 @@ class HomeViewModel extends ChangeNotifier {
     _screenState = _vpnStateToScreen(state);
     if (state == VpnConnectionState.disconnected) {
       _activeConfig = null;
+      _activeWarpConfig = null;
       _errorMessage = null;
     }
     notifyListeners();

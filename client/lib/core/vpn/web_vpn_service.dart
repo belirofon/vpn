@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../domain/entities/vpn_config.dart';
+import '../../domain/entities/warp_config.dart';
 import '../../domain/services/vpn_service.dart';
 
 class WebVpnService implements VpnService {
@@ -17,6 +18,13 @@ class WebVpnService implements VpnService {
   Future<void> connect(VpnConfig config) async {
     _setState(VpnConnectionState.connecting);
     // Simulate connection delay for UI testing
+    await Future.delayed(const Duration(seconds: 2));
+    _setState(VpnConnectionState.connected);
+  }
+
+  @override
+  Future<void> connectWarp(WarpConfig config) async {
+    _setState(VpnConnectionState.connecting);
     await Future.delayed(const Duration(seconds: 2));
     _setState(VpnConnectionState.connected);
   }
