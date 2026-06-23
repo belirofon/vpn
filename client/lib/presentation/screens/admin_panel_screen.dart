@@ -20,6 +20,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   late AdminViewModel _viewModel;
   late TextEditingController _subscriptionController;
   late TextEditingController _refreshIntervalController;
+  late TextEditingController _importUrlController;
+  late TextEditingController _importJsonController;
+  late TextEditingController _importRawLinksController;
   bool _controllersInitialized = false;
 
   @override
@@ -28,9 +31,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _viewModel = AdminViewModel(apiClient: widget.apiClient);
     _subscriptionController = TextEditingController();
     _refreshIntervalController = TextEditingController();
+    _importUrlController = TextEditingController();
+    _importJsonController = TextEditingController();
+    _importRawLinksController = TextEditingController();
     _viewModel.addListener(_onDataLoaded);
     _viewModel.loadData();
     _viewModel.loadWarp();
+    _viewModel.loadBestConfigs();
   }
 
   @override
@@ -38,6 +45,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _viewModel.removeListener(_onDataLoaded);
     _subscriptionController.dispose();
     _refreshIntervalController.dispose();
+    _importUrlController.dispose();
+    _importJsonController.dispose();
+    _importRawLinksController.dispose();
     super.dispose();
   }
 
@@ -216,10 +226,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           onDelete: _deleteWarp,
         );
       case 4:
-        return _BestConfigsScanSection(
+        return _BestConfigsSection(
+          bestConfigs: _viewModel.bestConfigs,
           isScanning: _viewModel.isScanning,
           scanResult: _viewModel.scanResult,
+          isBestConfigsLoading: _viewModel.isBestConfigsLoading,
+          isImporting: _viewModel.isImporting,
+          importResult: _viewModel.importResult,
+          importUrlController: _importUrlController,
+          importJsonController: _importJsonController,
+          importRawLinksController: _importRawLinksController,
           onScan: _scanQr,
+          onImportUrl: _importFromUrl,
+          onImportJson: _importFromJson,
+          onImportRawLinks: _importFromRawLinks,
+          onDeleteConfig: _deleteBestConfig,
+          onRefresh: _viewModel.loadBestConfigs,
         );
       case 5:
         if (_viewModel.config != null) {
@@ -250,6 +272,69 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         backgroundColor: result.startsWith('Error') || result.contains('Failed')
             ? Theme.of(context).colorScheme.error
             : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _importFromUrl() async {
+    final url = _importUrlController.text.trim();
+    if (url.isEmpty) return;
+    final result = await _viewModel.importFromUrl(url);
+    if (!mounted) return;
+    _importUrlController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: result.contains('Failed') || result.contains('Error')
+            ? Theme.of(context).colorScheme.error
+            : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _importFromJson() async {
+    final text = _importJsonController.text.trim();
+    if (text.isEmpty) return;
+    final result = await _viewModel.importFromJson(text);
+    if (!mounted) return;
+    _importJsonController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: result.contains('Failed') || result.contains('Error')
+            ? Theme.of(context).colorScheme.error
+            : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _importFromRawLinks() async {
+    final text = _importRawLinksController.text.trim();
+    if (text.isEmpty) return;
+    final result = await _viewModel.importFromRawLinks(text);
+    if (!mounted) return;
+    _importRawLinksController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: result.contains('Failed') || result.contains('Error')
+            ? Theme.of(context).colorScheme.error
+            : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _deleteBestConfig(String id) async {
+    final ok = await _viewModel.deleteBestConfig(id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Config deleted' : 'Failed to delete config'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: ok ? Colors.green : Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -442,17 +527,41 @@ class _EndpointsSection extends StatelessWidget {
   }
 }
 
-// -- Best Configs Scan Section --
+// -- Best Configs Management Section --
 
-class _BestConfigsScanSection extends StatelessWidget {
+class _BestConfigsSection extends StatelessWidget {
+  final List<Map<String, dynamic>>? bestConfigs;
   final bool isScanning;
   final String scanResult;
+  final bool isBestConfigsLoading;
+  final bool isImporting;
+  final String importResult;
+  final TextEditingController importUrlController;
+  final TextEditingController importJsonController;
+  final TextEditingController importRawLinksController;
   final VoidCallback onScan;
+  final VoidCallback onImportUrl;
+  final VoidCallback onImportJson;
+  final VoidCallback onImportRawLinks;
+  final ValueChanged<String> onDeleteConfig;
+  final VoidCallback onRefresh;
 
-  const _BestConfigsScanSection({
+  const _BestConfigsSection({
+    required this.bestConfigs,
     required this.isScanning,
     required this.scanResult,
+    required this.isBestConfigsLoading,
+    required this.isImporting,
+    required this.importResult,
+    required this.importUrlController,
+    required this.importJsonController,
+    required this.importRawLinksController,
     required this.onScan,
+    required this.onImportUrl,
+    required this.onImportJson,
+    required this.onImportRawLinks,
+    required this.onDeleteConfig,
+    required this.onRefresh,
   });
 
   @override
@@ -463,53 +572,300 @@ class _BestConfigsScanSection extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: _SectionCard(
         icon: Icons.qr_code_scanner,
-        title: 'Best Configs Scanner',
+        title: 'Best Configs Management',
+        trailing: IconButton(
+          icon: const Icon(Icons.refresh, size: 18),
+          onPressed: onRefresh,
+          tooltip: 'Refresh list',
+        ),
         children: [
           const Text(
-            'Scan a QR code with a VPN config URL, JSON, or proxy link to make it available for all clients in the "Best" tab.',
+            'Add configs to make them available for all clients in the "Best" tab.',
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: 12),
+
+          // QR Scan
           SizedBox(
             width: double.infinity,
             child: FilledButton.tonalIcon(
               onPressed: isScanning ? null : onScan,
               icon: isScanning
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 18, height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.qr_code_scanner, size: 20),
               label: Text(isScanning ? 'Processing…' : 'Scan QR Code'),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
           if (scanResult.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: scanResult.startsWith('Error') || scanResult.contains('Failed')
-                    ? theme.colorScheme.errorContainer
-                    : Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                scanResult,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scanResult.startsWith('Error') || scanResult.contains('Failed')
-                      ? theme.colorScheme.onErrorContainer
-                      : Colors.green.shade800,
+            const SizedBox(height: 6),
+            _ResultBanner(result: scanResult),
+          ],
+          const SizedBox(height: 8),
+
+          // Import from URL
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Subscription URL',
+                    hintText: 'https://example.com/configs',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                  controller: importUrlController,
+                  onSubmitted: (_) => onImportUrl(),
                 ),
               ),
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: isImporting ? null : onImportUrl,
+                child: isImporting
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Fetch'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Import from raw links (textarea)
+          const Text('Or paste proxy links (one per line):',
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 4),
+          TextField(
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'ss://...\nvless://...\ntrojan://...',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.all(10),
             ),
+            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            controller: importRawLinksController,
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isImporting ? null : onImportRawLinks,
+                  child: const Text('Import Links', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isImporting ? null : onImportJson,
+                  child: const Text('Import JSON', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+          if (importResult.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _ResultBanner(result: importResult),
           ],
+          const Divider(height: 24),
+
+          // -- Config list --
+          Row(
+            children: [
+              const Icon(Icons.list, size: 16, color: Colors.grey),
+              const SizedBox(width: 6),
+              Text(
+                'Stored configs (${bestConfigs?.length ?? 0})',
+                style: theme.textTheme.titleSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (isBestConfigsLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (bestConfigs == null || bestConfigs!.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('No configs added yet',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+            )
+          else
+            ...bestConfigs!.map((cfg) => _ConfigListItem(
+                  config: cfg,
+                  onDelete: () => onDeleteConfig(cfg['id'] as String? ?? ''),
+                )),
         ],
+      ),
+    );
+  }
+}
+
+class _ConfigListItem extends StatelessWidget {
+  final Map<String, dynamic> config;
+  final VoidCallback onDelete;
+
+  const _ConfigListItem({
+    required this.config,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final name = config['name'] as String? ?? config['server'] as String? ?? 'Unknown';
+    final server = config['server'] as String? ?? '';
+    final protocol = config['protocol'] as String? ?? '';
+    final latency = config['latency_ms'] as int? ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (protocol.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: _protocolColor(protocol)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              protocol.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: _protocolColor(protocol),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (server.isNotEmpty)
+                      Text(
+                        server,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    if (latency > 0)
+                      Text(
+                        '${latency}ms',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: latency < 150
+                              ? Colors.green
+                              : latency < 300
+                                  ? Colors.orange
+                                  : Colors.red,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: onDelete,
+                tooltip: 'Delete config',
+                color: theme.colorScheme.error,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _protocolColor(String protocol) {
+    switch (protocol) {
+      case 'vless':
+        return Colors.purple;
+      case 'vmess':
+        return Colors.blue;
+      case 'trojan':
+        return Colors.orange;
+      case 'ss':
+        return Colors.teal;
+      case 'warp':
+        return Colors.indigo;
+      default:
+        return Colors.grey;
+    }
+  }
+}
+
+class _ResultBanner extends StatelessWidget {
+  final String result;
+
+  const _ResultBanner({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isError =
+        result.startsWith('Error') || result.contains('Failed');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isError
+            ? theme.colorScheme.errorContainer
+            : Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        result,
+        style: TextStyle(
+          fontSize: 12,
+          color: isError
+              ? theme.colorScheme.onErrorContainer
+              : Colors.green.shade800,
+        ),
       ),
     );
   }

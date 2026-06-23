@@ -1,15 +1,20 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"vpn-server/internal/cache"
+	"vpn-server/internal/fetcher"
 	"vpn-server/internal/model"
+	"vpn-server/internal/parser"
+	"vpn-server/internal/singbox"
 )
 
 var (
@@ -285,6 +290,13 @@ func AdminPostBestConfig(c *gin.Context, cc *cache.ConfigCache) {
 		Network  string `json:"network,omitempty"`
 		RawLink  string `json:"raw_link,omitempty"`
 		Country  string `json:"country,omitempty"`
+		Host     string `json:"host,omitempty"`
+		Path     string `json:"path,omitempty"`
+		SNI      string `json:"sni,omitempty"`
+		FP       string `json:"fp,omitempty"`
+		ALPN     string `json:"alpn,omitempty"`
+		Pbk      string `json:"pbk,omitempty"`
+		Sid      string `json:"sid,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
@@ -303,6 +315,34 @@ func AdminPostBestConfig(c *gin.Context, cc *cache.ConfigCache) {
 		Network:  req.Network,
 		RawLink:  req.RawLink,
 		Country:  req.Country,
+		Host:     req.Host,
+		Path:     req.Path,
+		SNI:      req.SNI,
+		FP:       req.FP,
+		ALPN:     req.ALPN,
+		Pbk:      req.Pbk,
+		Sid:      req.Sid,
+	}
+	// If raw_link is set, parse it to fill missing fields and generate singboxConfig
+	if cfg.RawLink != "" {
+		if parsed := parser.ParseConfigLink(cfg.RawLink); parsed != nil {
+			cfg = *parsed
+			if req.ID != "" {
+				cfg.ID = req.ID
+			}
+			if req.Name != "" {
+				cfg.Name = req.Name
+			}
+			if req.Country != "" {
+				cfg.Country = req.Country
+			}
+		}
+	}
+	// If no singboxConfig yet but we have enough fields, generate it directly
+	if cfg.SingboxConfig == nil && cfg.Server != "" && cfg.Port > 0 {
+		if sc := singbox.GenerateOutbound(&cfg); sc != nil {
+			cfg.SingboxConfig = sc
+		}
 	}
 	if cfg.ID == "" {
 		cfg.ID = cfg.Server + ":" + itoa(cfg.Port)
@@ -327,6 +367,171 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(buf[i:])
+}
+
+// AdminListBestConfigs returns all best configs.
+func AdminListBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
+	configs := cc.GetBestConfigs()
+	c.JSON(http.StatusOK, model.BestConfigListResponse{
+		Configs: configs,
+		Total:   len(configs),
+	})
+}
+
+// AdminUpdateBestConfig updates a single best config by ID.
+func AdminUpdateBestConfig(c *gin.Context, cc *cache.ConfigCache) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_id"})
+		return
+	}
+
+	var req struct {
+		Name     string `json:"name,omitempty"`
+		Server   string `json:"server,omitempty"`
+		Port     int    `json:"port,omitempty"`
+		Protocol string `json:"protocol,omitempty"`
+		UUID     string `json:"uuid,omitempty"`
+		Password string `json:"password,omitempty"`
+		TLS      string `json:"tls,omitempty"`
+		Network  string `json:"network,omitempty"`
+		RawLink  string `json:"raw_link,omitempty"`
+		Country  string `json:"country,omitempty"`
+		Host     string `json:"host,omitempty"`
+		Path     string `json:"path,omitempty"`
+		SNI      string `json:"sni,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
+		return
+	}
+
+	updated := model.VpnConfig{
+		Name:     req.Name,
+		Server:   req.Server,
+		Port:     req.Port,
+		Protocol: req.Protocol,
+		UUID:     req.UUID,
+		Password: req.Password,
+		TLS:      req.TLS,
+		Network:  req.Network,
+		RawLink:  req.RawLink,
+		Country:  req.Country,
+		Host:     req.Host,
+		Path:     req.Path,
+		SNI:      req.SNI,
+	}
+
+	// If raw_link is provided, parse it to fill fields and generate singboxConfig
+	if updated.RawLink != "" {
+		if parsed := parser.ParseConfigLink(updated.RawLink); parsed != nil {
+			// Preserve overrides from request
+			overrides := updated
+			updated = *parsed
+			if overrides.Name != "" {
+				updated.Name = overrides.Name
+			}
+			if overrides.Country != "" {
+				updated.Country = overrides.Country
+			}
+		}
+	}
+	// Generate singboxConfig if missing but fields are available
+	if updated.SingboxConfig == nil && updated.Server != "" && updated.Port > 0 {
+		if sc := singbox.GenerateOutbound(&updated); sc != nil {
+			updated.SingboxConfig = sc
+		}
+	}
+
+	if result := cc.UpdateBestConfig(id, updated); result != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "updated", "config": result})
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "config_not_found", "message": "No best config found with the given ID"})
+	}
+}
+
+// AdminDeleteBestConfigByID deletes a single best config by ID.
+func AdminDeleteBestConfigByID(c *gin.Context, cc *cache.ConfigCache) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_id"})
+		return
+	}
+
+	if cc.DeleteBestConfig(id) {
+		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "config_not_found", "message": "No best config found with the given ID"})
+	}
+}
+
+// AdminImportBestConfigs imports configs from a URL, raw_links list, or configs array.
+func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
+	var req struct {
+		URL      string              `json:"url,omitempty"`
+		RawLinks []string            `json:"raw_links,omitempty"`
+		Configs  []model.VpnConfig   `json:"configs,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
+		return
+	}
+
+	var added int
+
+	// Case 1: URL — fetch and parse like subscription
+	if req.URL != "" {
+		slog.Info("importing best configs from URL", "url", req.URL)
+		data, err := fetcher.FetchSubscription(context.Background(), req.URL, 30*time.Second)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error":   "fetch_failed",
+				"message": "Failed to fetch URL: " + err.Error(),
+			})
+			return
+		}
+
+		links := parser.ParseSubscription(data)
+		for _, link := range links {
+			if parsed := parser.ParseConfigLink(link); parsed != nil {
+				cc.AddBestConfig(*parsed)
+				added++
+			}
+		}
+	}
+
+	// Case 2: raw_links list
+	for _, link := range req.RawLinks {
+		if parsed := parser.ParseConfigLink(link); parsed != nil {
+			cc.AddBestConfig(*parsed)
+			added++
+		}
+	}
+
+	// Case 3: full config objects
+	for _, cfg := range req.Configs {
+		// Generate singboxConfig if missing
+		if cfg.SingboxConfig == nil && cfg.Server != "" && cfg.Port > 0 {
+			if sc := singbox.GenerateOutbound(&cfg); sc != nil {
+				cfg.SingboxConfig = sc
+			}
+		}
+		if cfg.ID == "" {
+			cfg.ID = cfg.Server + ":" + itoa(cfg.Port)
+		}
+		if cfg.Name == "" {
+			cfg.Name = cfg.Server
+		}
+		cc.AddBestConfig(cfg)
+		added++
+	}
+
+	if added == 0 {
+		c.JSON(http.StatusOK, gin.H{"status": "no_configs_added", "added": 0})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "imported", "added": added})
 }
 
 // AdminDeleteBestConfigs clears all best configs.
@@ -392,12 +597,28 @@ func SetupAdminRoutes(r *gin.Engine, cc *cache.ConfigCache) {
 			AdminDeleteWarp(c, cc)
 		})
 
+		admin.GET("/best-configs", func(c *gin.Context) {
+			AdminListBestConfigs(c, cc)
+		})
+
 		admin.POST("/best-configs", func(c *gin.Context) {
 			AdminPostBestConfig(c, cc)
 		})
 
+		admin.PUT("/best-configs/:id", func(c *gin.Context) {
+			AdminUpdateBestConfig(c, cc)
+		})
+
+		admin.DELETE("/best-configs/:id", func(c *gin.Context) {
+			AdminDeleteBestConfigByID(c, cc)
+		})
+
 		admin.DELETE("/best-configs", func(c *gin.Context) {
 			AdminDeleteBestConfigs(c, cc)
+		})
+
+		admin.POST("/best-configs/import", func(c *gin.Context) {
+			AdminImportBestConfigs(c, cc)
 		})
 	}
 }

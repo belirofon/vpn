@@ -18,6 +18,10 @@ class AdminViewModel extends ChangeNotifier {
   bool _isWarpGenerating = false;
   bool _isScanning = false;
   String _scanResult = '';
+  List<Map<String, dynamic>>? _bestConfigs;
+  bool _isBestConfigsLoading = false;
+  bool _isImporting = false;
+  String _importResult = '';
 
   AdminViewModel({required ApiClient apiClient}) : _apiClient = apiClient;
 
@@ -32,6 +36,10 @@ class AdminViewModel extends ChangeNotifier {
   bool get isWarpGenerating => _isWarpGenerating;
   bool get isScanning => _isScanning;
   String get scanResult => _scanResult;
+  List<Map<String, dynamic>>? get bestConfigs => _bestConfigs;
+  bool get isBestConfigsLoading => _isBestConfigsLoading;
+  bool get isImporting => _isImporting;
+  String get importResult => _importResult;
 
   Future<void> loadData() async {
     _isLoading = true;
@@ -165,9 +173,12 @@ class AdminViewModel extends ChangeNotifier {
       }
 
       final ok = await _apiClient.adminPostBestConfig(config);
-      _scanResult = ok
-          ? 'Config added successfully'
-          : 'Failed to add config to server';
+      if (ok) {
+        _scanResult = 'Config added successfully';
+        loadBestConfigs();
+      } else {
+        _scanResult = 'Failed to add config to server';
+      }
     } catch (e) {
       _scanResult = 'Error: $e';
     }
@@ -212,5 +223,130 @@ class AdminViewModel extends ChangeNotifier {
       notifyListeners();
     }
     return ok;
+  }
+
+  // -- Best Configs Management --
+
+  Future<void> loadBestConfigs() async {
+    _isBestConfigsLoading = true;
+    notifyListeners();
+
+    _bestConfigs = await _apiClient.adminGetBestConfigs();
+
+    _isBestConfigsLoading = false;
+    notifyListeners();
+  }
+
+  Future<bool> deleteBestConfig(String id) async {
+    final ok = await _apiClient.adminDeleteBestConfig(id);
+    if (ok) {
+      await loadBestConfigs();
+    }
+    return ok;
+  }
+
+  /// Imports configs from a subscription URL. Returns the server response message.
+  Future<String> importFromUrl(String url) async {
+    _isImporting = true;
+    _importResult = '';
+    notifyListeners();
+
+    try {
+      final result = await _apiClient.adminImportBestConfigs(url: url);
+      if (result != null) {
+        final added = result['added'] ?? 0;
+        _importResult = added is int && added > 0
+            ? 'Imported $added configs'
+            : 'No configs found at URL';
+      } else {
+        _importResult = 'Failed to import from URL';
+      }
+    } catch (e) {
+      _importResult = 'Error: $e';
+    }
+
+    _isImporting = false;
+    notifyListeners();
+    await loadBestConfigs();
+    return _importResult;
+  }
+
+  /// Imports configs from raw proxy links (one per line).
+  Future<String> importFromRawLinks(String rawText) async {
+    _isImporting = true;
+    _importResult = '';
+    notifyListeners();
+
+    try {
+      final links = rawText
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+
+      if (links.isEmpty) {
+        _importResult = 'No links provided';
+        _isImporting = false;
+        notifyListeners();
+        return _importResult;
+      }
+
+      final result = await _apiClient.adminImportBestConfigs(rawLinks: links);
+      if (result != null) {
+        final added = result['added'] ?? 0;
+        _importResult = added is int && added > 0
+            ? 'Imported $added configs'
+            : 'No valid configs found';
+      } else {
+        _importResult = 'Failed to import configs';
+      }
+    } catch (e) {
+      _importResult = 'Error: $e';
+    }
+
+    _isImporting = false;
+    notifyListeners();
+    await loadBestConfigs();
+    return _importResult;
+  }
+
+  /// Imports configs from a JSON array of config objects.
+  Future<String> importFromJson(String jsonText) async {
+    _isImporting = true;
+    _importResult = '';
+    notifyListeners();
+
+    try {
+      final parsed = jsonDecode(jsonText);
+      List<Map<String, dynamic>> configs;
+
+      if (parsed is List) {
+        configs = parsed.cast<Map<String, dynamic>>();
+      } else if (parsed is Map<String, dynamic>) {
+        configs = [parsed];
+      } else {
+        _importResult = 'Invalid JSON: expected object or array';
+        _isImporting = false;
+        notifyListeners();
+        return _importResult;
+      }
+
+      final result = await _apiClient.adminImportBestConfigs(configs: configs);
+      if (result != null) {
+        final added = result['added'] ?? 0;
+        _importResult = added is int && added > 0
+            ? 'Imported $added configs'
+            : 'No valid configs in JSON';
+      } else {
+        _importResult = 'Failed to import configs';
+      }
+    } catch (e) {
+      _importResult = 'Error: $e';
+    }
+
+    _isImporting = false;
+    notifyListeners();
+    await loadBestConfigs();
+    return _importResult;
   }
 }

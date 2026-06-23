@@ -3,7 +3,9 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -15,19 +17,20 @@ import (
 
 // ConfigCache is a thread-safe cache of tested and filtered VPN configs.
 type ConfigCache struct {
-	mu          sync.RWMutex
-	cfg         config.Config
-	status      model.ServerStatus
-	statusMsg   string
-	configs     []model.VpnConfig
-	bestConfigs []model.VpnConfig
-	warpConfig  *model.WarpConfig
-	updated     time.Time
-	startedAt   time.Time
-	pl          *pipeline.Pipeline
-	ticker      *time.Ticker
-	stopCh      chan struct{}
-	logger      *slog.Logger
+	mu              sync.RWMutex
+	cfg             config.Config
+	status          model.ServerStatus
+	statusMsg       string
+	configs         []model.VpnConfig
+	bestConfigs     []model.VpnConfig
+	warpConfig      *model.WarpConfig
+	updated         time.Time
+	startedAt       time.Time
+	pl              *pipeline.Pipeline
+	ticker          *time.Ticker
+	stopCh          chan struct{}
+	logger          *slog.Logger
+	bestConfigsPath string
 }
 
 // NewCache creates a new ConfigCache.
@@ -36,11 +39,12 @@ func NewCache(cfg config.Config, g *geo.DB, logger *slog.Logger) *ConfigCache {
 		logger = slog.Default()
 	}
 	cc := &ConfigCache{
-		cfg:       cfg,
-		stopCh:    make(chan struct{}),
-		status:    model.StatusLoading,
-		startedAt: time.Now(),
-		logger:    logger,
+		cfg:             cfg,
+		stopCh:          make(chan struct{}),
+		status:          model.StatusLoading,
+		startedAt:       time.Now(),
+		logger:          logger,
+		bestConfigsPath: cfg.BestConfigsPath,
 	}
 	cc.pl = pipeline.New(&cc.cfg, g, logger)
 	return cc
@@ -104,7 +108,7 @@ func (cc *ConfigCache) GetBestConfigs() []model.VpnConfig {
 	return result
 }
 
-// AddBestConfig appends a config to the admin-scanned best configs list.
+// AddBestConfig appends a config to the admin-scanned best configs list and persists to disk.
 func (cc *ConfigCache) AddBestConfig(cfg model.VpnConfig) {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
@@ -114,6 +118,7 @@ func (cc *ConfigCache) AddBestConfig(cfg model.VpnConfig) {
 		"name", cfg.Name,
 		"server", cfg.Server,
 	)
+	cc.persistBestConfigs()
 }
 
 // ClearBestConfigs removes all admin-scanned best configs.
@@ -123,6 +128,81 @@ func (cc *ConfigCache) ClearBestConfigs() {
 
 	cc.bestConfigs = nil
 	cc.logger.Info("best configs cleared")
+	cc.persistBestConfigs()
+}
+
+// DeleteBestConfig removes a single best config by its index or ID.
+// Returns true if a config was removed.
+func (cc *ConfigCache) DeleteBestConfig(id string) bool {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	for i, c := range cc.bestConfigs {
+		if c.ID == id {
+			cc.bestConfigs = append(cc.bestConfigs[:i], cc.bestConfigs[i+1:]...)
+			cc.logger.Info("best config deleted", "id", id)
+			cc.persistBestConfigs()
+			return true
+		}
+	}
+	return false
+}
+
+// UpdateBestConfig updates a single best config by its ID.
+// Returns the updated config or nil if not found.
+func (cc *ConfigCache) UpdateBestConfig(id string, updated model.VpnConfig) *model.VpnConfig {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	for i, c := range cc.bestConfigs {
+		if c.ID == id {
+			updated.ID = id
+			cc.bestConfigs[i] = updated
+			cc.logger.Info("best config updated", "id", id)
+			cc.persistBestConfigs()
+			result := cc.bestConfigs[i]
+			return &result
+		}
+	}
+	return nil
+}
+
+// persistBestConfigs writes best configs to the JSON file if a path is configured.
+func (cc *ConfigCache) persistBestConfigs() {
+	if cc.bestConfigsPath == "" {
+		return
+	}
+	data, err := json.MarshalIndent(cc.bestConfigs, "", "  ")
+	if err != nil {
+		cc.logger.Error("failed to marshal best configs", "error", err)
+		return
+	}
+	if err := os.WriteFile(cc.bestConfigsPath, data, 0644); err != nil {
+		cc.logger.Error("failed to write best configs", "path", cc.bestConfigsPath, "error", err)
+	}
+}
+
+// loadBestConfigs reads best configs from the JSON file if a path is configured.
+func (cc *ConfigCache) loadBestConfigs() {
+	if cc.bestConfigsPath == "" {
+		return
+	}
+	data, err := os.ReadFile(cc.bestConfigsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cc.logger.Info("no best configs file found, starting fresh", "path", cc.bestConfigsPath)
+		} else {
+			cc.logger.Error("failed to read best configs", "path", cc.bestConfigsPath, "error", err)
+		}
+		return
+	}
+	var configs []model.VpnConfig
+	if err := json.Unmarshal(data, &configs); err != nil {
+		cc.logger.Error("failed to unmarshal best configs", "error", err)
+		return
+	}
+	cc.bestConfigs = configs
+	cc.logger.Info("loaded best configs from file", "path", cc.bestConfigsPath, "count", len(configs))
 }
 
 // GetUpdated returns the last update timestamp as RFC3339.
@@ -132,8 +212,9 @@ func (cc *ConfigCache) GetUpdated() string {
 	return cc.updated.Format(time.RFC3339)
 }
 
-// Init performs the initial config refresh synchronously.
+// Init performs the initial config refresh synchronously and loads persisted best configs.
 func (cc *ConfigCache) Init() {
+	cc.loadBestConfigs()
 	cc.refresh()
 }
 

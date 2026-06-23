@@ -77,6 +77,8 @@ type Config struct {
 	AdminEmail      string // ADMIN_EMAIL — admin login email
 	AdminPassword   string // ADMIN_PASSWORD — admin login password
 	WarpEnabled     bool   // WARP_ENABLED — enable WARP Cloudflare config generation
+	SwaggerHost     string // SWAGGER_HOST — swagger docs host (e.g. "belirofon-vpn.duckdns.org:8443")
+	BestConfigsPath string // BEST_CONFIGS_PATH — path to best configs JSON file for persistence
 }
 
 func LoadConfig() Config {
@@ -92,6 +94,8 @@ func LoadConfig() Config {
 		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
 		WarpEnabled:     os.Getenv("WARP_ENABLED") == "true",
+		SwaggerHost:     os.Getenv("SWAGGER_HOST"),
+		BestConfigsPath: os.Getenv("BEST_CONFIGS_PATH"),
 	}
 	return cfg
 }

@@ -11,7 +11,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server/...
 
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata && \
+    mkdir -p /app/data
 
 WORKDIR /app
 COPY --from=builder /app/server .

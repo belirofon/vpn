@@ -73,8 +73,9 @@ func main() {
 	handler.SetupRoutes(r, c)
 	handler.SetupUpdateRoutes(r)
 
-	// Swagger: use empty host so UI defaults to the page's origin
-	docs.SwaggerInfo.Host = ""
+	if cfg.SwaggerHost != "" {
+		docs.SwaggerInfo.Host = cfg.SwaggerHost
+	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	srv := &http.Server{

@@ -181,8 +181,22 @@ class MobileVpnService implements VpnService {
         fallbackOutbound['uuid'] = uri.userInfo;
         fallbackOutbound['security'] = 'auto';
       } else if (uri.scheme == 'ss') {
-        fallbackOutbound['password'] = uri.userInfo;
-        fallbackOutbound['method'] = 'aes-256-gcm';
+        // SS URI: ss://base64(method:password)@host:port
+        // Try base64 decode first (SIP002), fall back to raw userInfo
+        String decoded;
+        try {
+          decoded = utf8.decode(base64Decode(uri.userInfo));
+        } catch (_) {
+          decoded = uri.userInfo;
+        }
+        final colonIndex = decoded.indexOf(':');
+        if (colonIndex > 0) {
+          fallbackOutbound['method'] = decoded.substring(0, colonIndex);
+          fallbackOutbound['password'] = decoded.substring(colonIndex + 1);
+        } else {
+          fallbackOutbound['password'] = decoded;
+          fallbackOutbound['method'] = 'aes-256-gcm';
+        }
       }
 
       if (query['type'] != null && query['type'] != 'tcp') {

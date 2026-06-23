@@ -165,6 +165,90 @@ class ApiClient {
     }
   }
 
+  Future<List<Map<String, dynamic>>?> adminGetBestConfigs() async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return null;
+
+    try {
+      final response = await _http.get(
+        '/api/admin/best-configs',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200 && response.data?['configs'] is List) {
+        return (response.data!['configs'] as List)
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminGetBestConfigs error: $e');
+      return null;
+    }
+  }
+
+  Future<bool> adminUpdateBestConfig(String id, Map<String, dynamic> data) async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return false;
+
+    try {
+      final response = await _http.put(
+        '/api/admin/best-configs/$id',
+        data: data,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminUpdateBestConfig error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteBestConfig(String id) async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return false;
+
+    try {
+      final response = await _http.delete(
+        '/api/admin/best-configs/$id',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiClient.adminDeleteBestConfig error: $e');
+      return false;
+    }
+  }
+
+  /// Import best configs from a URL, raw links, or config objects.
+  Future<Map<String, dynamic>?> adminImportBestConfigs({
+    String? url,
+    List<String>? rawLinks,
+    List<Map<String, dynamic>>? configs,
+  }) async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return null;
+
+    try {
+      final body = <String, dynamic>{};
+      if (url != null) body['url'] = url;
+      if (rawLinks != null) body['raw_links'] = rawLinks;
+      if (configs != null) body['configs'] = configs;
+
+      final response = await _http.post(
+        '/api/admin/best-configs/import',
+        data: body,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiClient.adminImportBestConfigs error: $e');
+      return null;
+    }
+  }
+
   // -- Admin API methods --
 
   Future<String?> adminLogin(String email, String password) async {
