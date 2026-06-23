@@ -299,6 +299,10 @@ func processConfFile(data []byte) ([]model.VpnConfig, error) {
 		return extractSingboxOutbounds(sbConfig.Outbounds)
 	}
 
+	if cfg := processWireGuardConf(data); cfg != nil {
+		return []model.VpnConfig{*cfg}, nil
+	}
+
 	// Fallback: treat as plain text with proxy links
 	links := parser.ParseSubscription(data)
 	var cfgs []model.VpnConfig
@@ -312,6 +316,159 @@ func processConfFile(data []byte) ([]model.VpnConfig, error) {
 	}
 
 	return nil, fmt.Errorf("conf file contains no recognizable configs")
+}
+
+func processWireGuardConf(data []byte) *model.VpnConfig {
+	text := string(data)
+	lines := strings.Split(text, "\n")
+
+	var iface struct {
+		PrivateKey string
+		Address    string
+		DNS        string
+		MTU        string
+	}
+	var peer struct {
+		PublicKey           string
+		AllowedIPs          string
+		Endpoint            string
+		PersistentKeepalive string
+	}
+	var currentSection string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if line == "[Interface]" {
+			currentSection = "Interface"
+			continue
+		}
+		if line == "[Peer]" {
+			currentSection = "Peer"
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+
+		switch currentSection {
+		case "Interface":
+			switch key {
+			case "PrivateKey":
+				iface.PrivateKey = val
+			case "Address":
+				iface.Address = val
+			case "DNS":
+				iface.DNS = val
+			case "MTU":
+				iface.MTU = val
+			}
+		case "Peer":
+			switch key {
+			case "PublicKey":
+				peer.PublicKey = val
+			case "AllowedIPs":
+				peer.AllowedIPs = val
+			case "Endpoint":
+				peer.Endpoint = val
+			case "PersistentKeepalive":
+				peer.PersistentKeepalive = val
+			}
+		}
+	}
+
+	if iface.PrivateKey == "" || peer.PublicKey == "" || peer.Endpoint == "" {
+		return nil
+	}
+
+	server, portStr := splitHostPort(peer.Endpoint)
+	port := 0
+	for _, c := range portStr {
+		if c >= '0' && c <= '9' {
+			port = port*10 + int(c-'0')
+		}
+	}
+	if port == 0 {
+		port = 2408
+	}
+
+	name := server
+	if name == "" {
+		name = "wireguard"
+	}
+
+	cfg := &model.VpnConfig{
+		ID:       server + ":" + itoa(port),
+		Name:     name,
+		Server:   server,
+		Port:     port,
+		Protocol: "wireguard",
+	}
+
+	singboxCfg := generateWireGuardOutbound(cfg, iface, peer)
+	cfg.SingboxConfig = singboxCfg
+
+	return cfg
+}
+
+func splitHostPort(endpoint string) (string, string) {
+	if idx := strings.LastIndex(endpoint, ":"); idx >= 0 {
+		return endpoint[:idx], endpoint[idx+1:]
+	}
+	return endpoint, ""
+}
+
+func generateWireGuardOutbound(cfg *model.VpnConfig, iface struct {
+	PrivateKey string
+	Address    string
+	DNS        string
+	MTU        string
+}, peer struct {
+	PublicKey           string
+	AllowedIPs          string
+	Endpoint            string
+	PersistentKeepalive string
+}) *json.RawMessage {
+	addrs := strings.Fields(iface.Address)
+
+	ob := map[string]any{
+		"type":              "wireguard",
+		"server":            cfg.Server,
+		"server_port":       cfg.Port,
+		"local_private_key": iface.PrivateKey,
+		"peer_public_key":   peer.PublicKey,
+		"local_address":     addrs,
+	}
+
+	if iface.MTU != "" {
+		if mtu, err := parseInt(iface.MTU); err == nil {
+			ob["mtu"] = mtu
+		}
+	}
+
+	data, err := json.Marshal(ob)
+	if err != nil {
+		return nil
+	}
+	raw := json.RawMessage(data)
+	return &raw
+}
+
+func parseInt(s string) (int, error) {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("not a number")
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }
 
 // extractSingboxOutbounds extracts VpnConfig entries from sing-box outbound objects.
