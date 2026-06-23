@@ -150,7 +150,6 @@ class AdminViewModel extends ChangeNotifier {
       Map<String, dynamic> config;
 
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        // URL — fetch config JSON from the URL
         final response = await _apiClient.fetchJson(trimmed);
         if (response == null) {
           _scanResult = 'Failed to fetch config from URL';
@@ -158,10 +157,8 @@ class AdminViewModel extends ChangeNotifier {
         }
         config = response;
       } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        // JSON — parse directly
         config = _parseJson(trimmed);
       } else {
-        // Assume it's a proxy link (vless://, vmess://, trojan://, ss://)
         config = {
           'raw_link': trimmed,
           'id': trimmed.hashCode.toString(),
@@ -181,10 +178,10 @@ class AdminViewModel extends ChangeNotifier {
       }
     } catch (e) {
       _scanResult = 'Error: $e';
+    } finally {
+      _isScanning = false;
+      notifyListeners();
     }
-
-    _isScanning = false;
-    notifyListeners();
     return _scanResult;
   }
 
@@ -254,10 +251,14 @@ class AdminViewModel extends ChangeNotifier {
     try {
       final result = await _apiClient.adminImportBestConfigs(url: url);
       if (result != null) {
-        final added = result['added'] ?? 0;
-        _importResult = added is int && added > 0
-            ? 'Imported $added configs'
-            : 'No configs found at URL';
+        if (result['error'] != null) {
+          _importResult = result['message'] as String? ?? 'Import failed';
+        } else {
+          final added = result['added'] ?? 0;
+          _importResult = added is int && added > 0
+              ? 'Imported $added configs'
+              : 'No configs found at URL';
+        }
       } else {
         _importResult = 'Failed to import from URL';
       }

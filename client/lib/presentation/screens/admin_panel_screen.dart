@@ -641,7 +641,7 @@ class _BestConfigsSection extends StatelessWidget {
           const SizedBox(height: 8),
 
           // Import from raw links (textarea)
-          const Text('Or paste proxy links (one per line):',
+          const Text('Proxy links (one per line):',
               style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 4),
           TextField(
@@ -656,22 +656,37 @@ class _BestConfigsSection extends StatelessWidget {
             controller: importRawLinksController,
           ),
           const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isImporting ? null : onImportRawLinks,
-                  child: const Text('Import Links', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isImporting ? null : onImportJson,
-                  child: const Text('Import JSON', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: isImporting ? null : onImportRawLinks,
+              child: const Text('Import Links', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Import from JSON (textarea)
+          const Text('Or paste JSON config array:',
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 4),
+          TextField(
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: '[{"raw_link":"ss://...","name":"My SS"}]',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.all(10),
+            ),
+            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            controller: importJsonController,
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: isImporting ? null : onImportJson,
+              child: const Text('Import JSON', style: TextStyle(fontSize: 12)),
+            ),
           ),
           if (importResult.isNotEmpty) ...[
             const SizedBox(height: 6),

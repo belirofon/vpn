@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -465,12 +466,11 @@ func AdminDeleteBestConfigByID(c *gin.Context, cc *cache.ConfigCache) {
 	}
 }
 
-func importBestConfigsFromURL(ctx context.Context, cc *cache.ConfigCache, url string) int {
+func importBestConfigsFromURL(ctx context.Context, cc *cache.ConfigCache, url string) (int, error) {
 	slog.Info("importing best configs from URL", "url", url)
 	data, err := fetcher.FetchSubscription(ctx, url, 30*time.Second)
 	if err != nil {
-		slog.Error("failed to fetch URL", "url", url, "error", err)
-		return 0
+		return 0, fmt.Errorf("fetch failed: %w", err)
 	}
 	links := parser.ParseSubscription(data)
 	added := 0
@@ -480,7 +480,7 @@ func importBestConfigsFromURL(ctx context.Context, cc *cache.ConfigCache, url st
 			added++
 		}
 	}
-	return added
+	return added, nil
 }
 
 func importBestConfigsFromRawLinks(cc *cache.ConfigCache, links []string) int {
@@ -528,7 +528,16 @@ func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
 
 	added := 0
 	if req.URL != "" {
-		added += importBestConfigsFromURL(c.Request.Context(), cc, req.URL)
+		n, err := importBestConfigsFromURL(c.Request.Context(), cc, req.URL)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error":   "fetch_failed",
+				"message": err.Error(),
+				"added":   0,
+			})
+			return
+		}
+		added += n
 	}
 	if len(req.RawLinks) > 0 {
 		added += importBestConfigsFromRawLinks(cc, req.RawLinks)

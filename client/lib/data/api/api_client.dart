@@ -239,10 +239,7 @@ class ApiClient {
         data: body,
         headers: {'Authorization': 'Bearer $token'},
       );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
+      return response.data;
     } catch (e) {
       debugPrint('ApiClient.adminImportBestConfigs error: $e');
       return null;
