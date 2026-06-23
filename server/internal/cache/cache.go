@@ -177,7 +177,7 @@ func (cc *ConfigCache) persistBestConfigs() {
 		cc.logger.Error("failed to marshal best configs", "error", err)
 		return
 	}
-	if err := os.WriteFile(cc.bestConfigsPath, data, 0644); err != nil {
+	if err := os.WriteFile(cc.bestConfigsPath, data, 0600); err != nil {
 		cc.logger.Error("failed to write best configs", "path", cc.bestConfigsPath, "error", err)
 	}
 }

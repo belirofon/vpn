@@ -465,52 +465,38 @@ func AdminDeleteBestConfigByID(c *gin.Context, cc *cache.ConfigCache) {
 	}
 }
 
-// AdminImportBestConfigs imports configs from a URL, raw_links list, or configs array.
-func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
-	var req struct {
-		URL      string              `json:"url,omitempty"`
-		RawLinks []string            `json:"raw_links,omitempty"`
-		Configs  []model.VpnConfig   `json:"configs,omitempty"`
+func importBestConfigsFromURL(ctx context.Context, cc *cache.ConfigCache, url string) int {
+	slog.Info("importing best configs from URL", "url", url)
+	data, err := fetcher.FetchSubscription(ctx, url, 30*time.Second)
+	if err != nil {
+		slog.Error("failed to fetch URL", "url", url, "error", err)
+		return 0
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
-		return
-	}
-
-	var added int
-
-	// Case 1: URL — fetch and parse like subscription
-	if req.URL != "" {
-		slog.Info("importing best configs from URL", "url", req.URL)
-		data, err := fetcher.FetchSubscription(context.Background(), req.URL, 30*time.Second)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{
-				"error":   "fetch_failed",
-				"message": "Failed to fetch URL: " + err.Error(),
-			})
-			return
-		}
-
-		links := parser.ParseSubscription(data)
-		for _, link := range links {
-			if parsed := parser.ParseConfigLink(link); parsed != nil {
-				cc.AddBestConfig(*parsed)
-				added++
-			}
-		}
-	}
-
-	// Case 2: raw_links list
-	for _, link := range req.RawLinks {
+	links := parser.ParseSubscription(data)
+	added := 0
+	for _, link := range links {
 		if parsed := parser.ParseConfigLink(link); parsed != nil {
 			cc.AddBestConfig(*parsed)
 			added++
 		}
 	}
+	return added
+}
 
-	// Case 3: full config objects
-	for _, cfg := range req.Configs {
-		// Generate singboxConfig if missing
+func importBestConfigsFromRawLinks(cc *cache.ConfigCache, links []string) int {
+	added := 0
+	for _, link := range links {
+		if parsed := parser.ParseConfigLink(link); parsed != nil {
+			cc.AddBestConfig(*parsed)
+			added++
+		}
+	}
+	return added
+}
+
+func importBestConfigsFromConfigs(cc *cache.ConfigCache, configs []model.VpnConfig) int {
+	added := 0
+	for _, cfg := range configs {
 		if cfg.SingboxConfig == nil && cfg.Server != "" && cfg.Port > 0 {
 			if sc := singbox.GenerateOutbound(&cfg); sc != nil {
 				cfg.SingboxConfig = sc
@@ -525,10 +511,30 @@ func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
 		cc.AddBestConfig(cfg)
 		added++
 	}
+	return added
+}
 
-	if added == 0 {
-		c.JSON(http.StatusOK, gin.H{"status": "no_configs_added", "added": 0})
+// AdminImportBestConfigs imports configs from a URL, raw_links list, or configs array.
+func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
+	var req struct {
+		URL      string            `json:"url,omitempty"`
+		RawLinks []string          `json:"raw_links,omitempty"`
+		Configs  []model.VpnConfig `json:"configs,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
 		return
+	}
+
+	added := 0
+	if req.URL != "" {
+		added += importBestConfigsFromURL(c.Request.Context(), cc, req.URL)
+	}
+	if len(req.RawLinks) > 0 {
+		added += importBestConfigsFromRawLinks(cc, req.RawLinks)
+	}
+	if len(req.Configs) > 0 {
+		added += importBestConfigsFromConfigs(cc, req.Configs)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "imported", "added": added})
