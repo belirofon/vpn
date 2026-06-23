@@ -65,20 +65,41 @@ class MobileVpnService implements VpnService {
         throw Exception('VPN permission denied');
       }
 
-      // Validate config
+      // Validate config — fallback to raw_link if server-provided config fails
       debugPrint('[MobileVpnService] connect() — calling checkConfig()');
+      String? validatedJson = singboxJson;
       try {
-        await _client.checkConfig(singboxJson);
+        await _client.checkConfig(validatedJson);
         debugPrint('[MobileVpnService] connect() — checkConfig() OK');
       } catch (e) {
         debugPrint('[MobileVpnService] connect() — checkConfig() FAILED: $e');
-        _setState(VpnConnectionState.error);
-        rethrow;
+        // If we used the server-provided singboxConfig, try fallback from raw_link
+        if (config.singboxConfig != null && config.rawLink != null && config.rawLink!.isNotEmpty) {
+          debugPrint('[MobileVpnService] connect() — fallback: building config from raw_link');
+          final fallbackJson = _buildFromRawLink(config);
+          if (fallbackJson != null) {
+            try {
+              await _client.checkConfig(fallbackJson);
+              validatedJson = fallbackJson;
+              debugPrint('[MobileVpnService] connect() — fallback checkConfig() OK');
+            } catch (fallbackErr) {
+              debugPrint('[MobileVpnService] connect() — fallback also FAILED: $fallbackErr');
+              _setState(VpnConnectionState.error);
+              rethrow;
+            }
+          } else {
+            _setState(VpnConnectionState.error);
+            rethrow;
+          }
+        } else {
+          _setState(VpnConnectionState.error);
+          rethrow;
+        }
       }
 
       // Create session options
       final sessionOptions = SessionOptions(
-        config: singboxJson,
+        config: validatedJson,
         notification: NotificationConfig(
           title: config.name,
           showTrafficStats: true,
@@ -125,6 +146,12 @@ class MobileVpnService implements VpnService {
 
     // Fallback: build an outbound from raw_link (legacy).
     debugPrint('[MobileVpnService] _buildFullConfig — WARN: singboxConfig missing, parsing raw_link');
+    return _buildFromRawLink(config);
+  }
+
+  /// Builds a sing-box config purely from the raw_link URI.
+  /// Used as fallback when server-provided singboxConfig is missing or invalid.
+  String? _buildFromRawLink(VpnConfig config) {
     final rawLink = config.rawLink;
     if (rawLink == null || rawLink.isEmpty) return null;
 
@@ -185,7 +212,7 @@ class MobileVpnService implements VpnService {
         },
       });
     } catch (e) {
-      debugPrint('[MobileVpnService] _buildFullConfig — fallback failed: $e');
+      debugPrint('[MobileVpnService] _buildFromRawLink — failed: $e');
       return null;
     }
   }

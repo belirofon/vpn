@@ -178,6 +178,12 @@ func buildTrojan(cfg *model.VpnConfig) map[string]any {
 func buildShadowsocks(cfg *model.VpnConfig) map[string]any {
 	method, password := splitSSPassword(cfg.Password)
 
+	// If method:password split failed (no colon) or method is empty,
+	// skip generating sing-box config — client will fall back to raw_link.
+	if method == "" {
+		return nil
+	}
+
 	outbound := map[string]any{
 		"type":        "shadowsocks",
 		"tag":         "proxy",
@@ -192,10 +198,11 @@ func buildShadowsocks(cfg *model.VpnConfig) map[string]any {
 
 // splitSSPassword splits "method:password" from the parsed Shadowsocks URI.
 // The decoded format is always "method:password" — method never contains ':'.
+// Returns empty method if the format is invalid (no colon found).
 func splitSSPassword(raw string) (method, password string) {
 	parts := strings.SplitN(raw, ":", 2)
 	if len(parts) < 2 {
-		return raw, ""
+		return "", ""
 	}
 	return parts[0], parts[1]
 }
