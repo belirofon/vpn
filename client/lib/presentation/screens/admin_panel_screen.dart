@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/api/api_client.dart';
@@ -240,6 +241,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           onImportUrl: _importFromUrl,
           onImportJson: _importFromJson,
           onImportRawLinks: _importFromRawLinks,
+          onImportFile: _importFromFile,
           onDeleteConfig: _deleteBestConfig,
           onRefresh: _viewModel.loadBestConfigs,
         );
@@ -325,6 +327,40 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             : Colors.green,
       ),
     );
+  }
+
+  Future<void> _importFromFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json', 'conf', 'zip', '7z', 'rar'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null || file.name.isEmpty) return;
+
+      final msg = await _viewModel.importFromFile(file.bytes!, file.name);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: msg.contains('Failed') || msg.contains('Error')
+              ? Theme.of(context).colorScheme.error
+              : Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('File picker error: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   Future<void> _deleteBestConfig(String id) async {
@@ -543,6 +579,7 @@ class _BestConfigsSection extends StatelessWidget {
   final VoidCallback onImportUrl;
   final VoidCallback onImportJson;
   final VoidCallback onImportRawLinks;
+  final VoidCallback onImportFile;
   final ValueChanged<String> onDeleteConfig;
   final VoidCallback onRefresh;
 
@@ -560,6 +597,7 @@ class _BestConfigsSection extends StatelessWidget {
     required this.onImportUrl,
     required this.onImportJson,
     required this.onImportRawLinks,
+    required this.onImportFile,
     required this.onDeleteConfig,
     required this.onRefresh,
   });
@@ -686,6 +724,16 @@ class _BestConfigsSection extends StatelessWidget {
             child: OutlinedButton(
               onPressed: isImporting ? null : onImportJson,
               child: const Text('Import JSON', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: isImporting ? null : onImportFile,
+              icon: const Icon(Icons.upload_file, size: 16),
+              label: const Text('Import from file',
+                  style: TextStyle(fontSize: 12)),
             ),
           ),
           if (importResult.isNotEmpty) ...[

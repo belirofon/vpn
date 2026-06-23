@@ -48,7 +48,7 @@ class DioHttpClient implements domain.HttpClient {
   @override
   Future<domain.HttpResponse> post(
     String url, {
-    Map<String, dynamic>? data,
+    dynamic data,
     Map<String, String>? headers,
   }) async {
     try {
@@ -92,7 +92,7 @@ class DioHttpClient implements domain.HttpClient {
   @override
   Future<domain.HttpResponse> put(
     String url, {
-    Map<String, dynamic>? data,
+    dynamic data,
     Map<String, String>? headers,
   }) async {
     try {

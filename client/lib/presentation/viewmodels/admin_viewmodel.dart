@@ -242,33 +242,63 @@ class AdminViewModel extends ChangeNotifier {
     return ok;
   }
 
-  /// Imports configs from a subscription URL. Returns the server response message.
+  /// Imports configs from a subscription URL (runs async on server).
+  /// Returns immediately with a progress message; polls for completion.
   Future<String> importFromUrl(String url) async {
     _isImporting = true;
-    _importResult = '';
+    _importResult = 'Starting import...';
     notifyListeners();
 
     try {
-      final result = await _apiClient.adminImportBestConfigs(url: url);
-      if (result != null) {
-        if (result['error'] != null) {
-          _importResult = result['message'] as String? ?? 'Import failed';
-        } else {
-          final added = result['added'] ?? 0;
-          _importResult = added is int && added > 0
-              ? 'Imported $added configs'
-              : 'No configs found at URL';
-        }
-      } else {
-        _importResult = 'Failed to import from URL';
+      final startResult = await _apiClient.adminImportBestConfigs(url: url);
+      if (startResult == null) {
+        _importResult = 'Failed to start import';
+        _isImporting = false;
+        notifyListeners();
+        return _importResult;
       }
+      if (startResult['error'] != null) {
+        _importResult = startResult['message'] as String? ?? 'Import failed';
+        _isImporting = false;
+        notifyListeners();
+        return _importResult;
+      }
+
+      // Poll for completion (up to 60s)
+      const maxPolls = 30;
+      for (int i = 0; i < maxPolls; i++) {
+        await Future.delayed(const Duration(seconds: 2));
+        final status = await _apiClient.adminImportBestConfigsResult();
+        if (status == null) continue;
+
+        final running = status['running'] == true;
+        final done = status['done'] == true;
+
+        if (!running && done) {
+          final added = status['added'] ?? 0;
+          final errMsg = status['error'] as String?;
+          if (errMsg != null && errMsg.isNotEmpty) {
+            _importResult = 'Import error: $errMsg';
+          } else {
+            _importResult = added is int && added > 0
+                ? 'Imported $added configs'
+                : 'No configs found at URL';
+          }
+          _isImporting = false;
+          notifyListeners();
+          await loadBestConfigs();
+          return _importResult;
+        }
+        _importResult = 'Importing... (${(i + 1) * 2}s)';
+        try { notifyListeners(); } catch (_) {}
+      }
+      _importResult = 'Import timed out';
     } catch (e) {
       _importResult = 'Error: $e';
     }
 
     _isImporting = false;
     notifyListeners();
-    await loadBestConfigs();
     return _importResult;
   }
 
@@ -340,6 +370,41 @@ class AdminViewModel extends ChangeNotifier {
             : 'No valid configs in JSON';
       } else {
         _importResult = 'Failed to import configs';
+      }
+    } catch (e) {
+      _importResult = 'Error: $e';
+    }
+
+    _isImporting = false;
+    notifyListeners();
+    await loadBestConfigs();
+    return _importResult;
+  }
+
+  /// Imports configs from a local file. Returns a descriptive result message.
+  Future<String> importFromFile(Uint8List bytes, String filename) async {
+    _isImporting = true;
+    _importResult = '';
+    notifyListeners();
+
+    try {
+      final result = await _apiClient.adminImportFile(bytes, filename);
+      if (result != null) {
+        if (result['error'] != null) {
+          _importResult = result['message'] as String? ?? 'Import failed';
+        } else {
+          final added = result['added'] ?? 0;
+          final errors = result['errors'] as List?;
+          var msg = added is int && added > 0
+              ? 'Imported $added configs'
+              : 'No configs found in file';
+          if (errors != null && errors.isNotEmpty) {
+            msg += '\nErrors: ${errors.join('; ')}';
+          }
+          _importResult = msg;
+        }
+      } else {
+        _importResult = 'Failed to upload file';
       }
     } catch (e) {
       _importResult = 'Error: $e';

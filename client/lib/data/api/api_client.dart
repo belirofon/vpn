@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/vpn_config.dart';
@@ -219,7 +220,47 @@ class ApiClient {
     }
   }
 
+  /// Upload a file to import as best configs (JSON, CONF, ZIP, 7Z, RAR).
+  Future<Map<String, dynamic>?> adminImportFile(
+      Uint8List bytes, String filename) async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return null;
+
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await _http.post(
+        '/api/admin/best-configs/import-file',
+        data: formData,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint('ApiClient.adminImportFile error: $e');
+      return null;
+    }
+  }
+
+  /// Returns the result of the last async import (polling).
+  Future<Map<String, dynamic>?> adminImportBestConfigsResult() async {
+    final token = _prefs?.getString('admin_token');
+    if (token == null) return null;
+
+    try {
+      final response = await _http.get(
+        '/api/admin/best-configs/import-result',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint('ApiClient.adminImportBestConfigsResult error: $e');
+      return null;
+    }
+  }
+
   /// Import best configs from a URL, raw links, or config objects.
+  /// Returns quickly with {"status":"processing"} — actual import runs in background.
   Future<Map<String, dynamic>?> adminImportBestConfigs({
     String? url,
     List<String>? rawLinks,

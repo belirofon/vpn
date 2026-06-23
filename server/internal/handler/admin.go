@@ -21,7 +21,17 @@ import (
 var (
 	adminToken   string
 	adminTokenMu sync.RWMutex
+
+	importResult   importStatus
+	importResultMu sync.Mutex
 )
+
+type importStatus struct {
+	Running bool   `json:"running"`
+	Done    bool   `json:"done"`
+	Added   int    `json:"added"`
+	Error   string `json:"error,omitempty"`
+}
 
 func generateToken() string {
 	b := make([]byte, 32)
@@ -514,7 +524,44 @@ func importBestConfigsFromConfigs(cc *cache.ConfigCache, configs []model.VpnConf
 	return added
 }
 
-// AdminImportBestConfigs imports configs from a URL, raw_links list, or configs array.
+func runImport(ctx context.Context, cc *cache.ConfigCache, req struct {
+	URL      string            `json:"url,omitempty"`
+	RawLinks []string          `json:"raw_links,omitempty"`
+	Configs  []model.VpnConfig `json:"configs,omitempty"`
+}) {
+	importResultMu.Lock()
+	importResult = importStatus{Running: true}
+	importResultMu.Unlock()
+
+	added := 0
+	var errStr string
+
+	if req.URL != "" {
+		n, err := importBestConfigsFromURL(ctx, cc, req.URL)
+		if err != nil {
+			errStr = err.Error()
+		} else {
+			added += n
+		}
+	}
+	if errStr == "" && len(req.RawLinks) > 0 {
+		added += importBestConfigsFromRawLinks(cc, req.RawLinks)
+	}
+	if errStr == "" && len(req.Configs) > 0 {
+		added += importBestConfigsFromConfigs(cc, req.Configs)
+	}
+
+	importResultMu.Lock()
+	importResult = importStatus{
+		Running: false,
+		Done:    true,
+		Added:   added,
+		Error:   errStr,
+	}
+	importResultMu.Unlock()
+}
+
+// AdminImportBestConfigs initiates async import from a URL, raw_links, or configs.
 func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
 	var req struct {
 		URL      string            `json:"url,omitempty"`
@@ -526,27 +573,24 @@ func AdminImportBestConfigs(c *gin.Context, cc *cache.ConfigCache) {
 		return
 	}
 
-	added := 0
-	if req.URL != "" {
-		n, err := importBestConfigsFromURL(c.Request.Context(), cc, req.URL)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{
-				"error":   "fetch_failed",
-				"message": err.Error(),
-				"added":   0,
-			})
-			return
-		}
-		added += n
+	importResultMu.Lock()
+	if importResult.Running {
+		importResultMu.Unlock()
+		c.JSON(http.StatusConflict, gin.H{"error": "import_already_running"})
+		return
 	}
-	if len(req.RawLinks) > 0 {
-		added += importBestConfigsFromRawLinks(cc, req.RawLinks)
-	}
-	if len(req.Configs) > 0 {
-		added += importBestConfigsFromConfigs(cc, req.Configs)
-	}
+	importResultMu.Unlock()
 
-	c.JSON(http.StatusOK, gin.H{"status": "imported", "added": added})
+	ctx := context.WithoutCancel(c.Request.Context())
+	go runImport(ctx, cc, req)
+	c.JSON(http.StatusAccepted, gin.H{"status": "processing"})
+}
+
+// AdminImportBestConfigsResult returns the result of the last async import.
+func AdminImportBestConfigsResult(c *gin.Context) {
+	importResultMu.Lock()
+	defer importResultMu.Unlock()
+	c.JSON(http.StatusOK, importResult)
 }
 
 // AdminDeleteBestConfigs clears all best configs.
@@ -634,6 +678,14 @@ func SetupAdminRoutes(r *gin.Engine, cc *cache.ConfigCache) {
 
 		admin.POST("/best-configs/import", func(c *gin.Context) {
 			AdminImportBestConfigs(c, cc)
+		})
+
+		admin.GET("/best-configs/import-result", func(c *gin.Context) {
+			AdminImportBestConfigsResult(c)
+		})
+
+		admin.POST("/best-configs/import-file", func(c *gin.Context) {
+			AdminImportFile(c, cc)
 		})
 	}
 }
