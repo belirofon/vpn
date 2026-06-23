@@ -1,15 +1,15 @@
 name: Deploy VPN Server
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Lint & Test"]
+    types: [completed]
     branches: [main, master]
-    paths:
-      - 'server/**'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
 
     steps:
