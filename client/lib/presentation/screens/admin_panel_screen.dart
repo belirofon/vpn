@@ -792,10 +792,24 @@ class _ConfigListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final name = config['name'] as String? ?? config['server'] as String? ?? 'Unknown';
     final server = config['server'] as String? ?? '';
     final protocol = config['protocol'] as String? ?? '';
     final latency = config['latency_ms'] as int? ?? 0;
+
+    // For WireGuard/WARP configs, prefer display name from singbox_config.
+    String name;
+    if (protocol == 'wireguard') {
+      final sc = config['singbox_config'] as Map<String, dynamic>?;
+      final cid = sc?['client_id'] as String?;
+      if (cid != null && cid.isNotEmpty) {
+        name = 'WARP $cid';
+      } else {
+        name = config['name'] as String? ?? server;
+      }
+    } else {
+      name = config['name'] as String? ?? server;
+    }
+    if (name.isEmpty) name = 'Unknown';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

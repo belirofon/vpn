@@ -318,35 +318,53 @@ func processConfFile(data []byte) ([]model.VpnConfig, error) {
 	return nil, fmt.Errorf("conf file contains no recognizable configs")
 }
 
-func processWireGuardConf(data []byte) *model.VpnConfig {
-	text := string(data)
-	lines := strings.Split(text, "\n")
+type wgInterface struct {
+	PrivateKey string
+	Address    string
+	DNS        string
+	MTU        string
+	I1         string // WARP-specific binary blob (Cloudflare reserved bytes)
+}
 
-	var iface struct {
-		PrivateKey string
-		Address    string
-		DNS        string
-		MTU        string
+type wgPeer struct {
+	PublicKey           string
+	AllowedIPs          string
+	Endpoint            string
+	PersistentKeepalive string
+}
+
+func parseWGConf(data []byte) (iface wgInterface, peer wgPeer) {
+	ifaceKeys := map[string]*string{
+		"PrivateKey": &iface.PrivateKey,
+		"Address":    &iface.Address,
+		"DNS":        &iface.DNS,
+		"MTU":        &iface.MTU,
+		"I1":         &iface.I1,
 	}
-	var peer struct {
-		PublicKey           string
-		AllowedIPs          string
-		Endpoint            string
-		PersistentKeepalive string
+	peerKeys := map[string]*string{
+		"PublicKey":           &peer.PublicKey,
+		"AllowedIPs":          &peer.AllowedIPs,
+		"Endpoint":            &peer.Endpoint,
+		"PersistentKeepalive": &peer.PersistentKeepalive,
 	}
-	var currentSection string
+
+	lines := strings.Split(string(data), "\n")
+	var keys map[string]*string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || line[0] == '#' {
 			continue
 		}
-		if line == "[Interface]" {
-			currentSection = "Interface"
+		switch line {
+		case "[Interface]":
+			keys = ifaceKeys
+			continue
+		case "[Peer]":
+			keys = peerKeys
 			continue
 		}
-		if line == "[Peer]" {
-			currentSection = "Peer"
+		if keys == nil {
 			continue
 		}
 
@@ -356,108 +374,185 @@ func processWireGuardConf(data []byte) *model.VpnConfig {
 		}
 		key := strings.TrimSpace(parts[0])
 		val := strings.TrimSpace(parts[1])
-
-		switch currentSection {
-		case "Interface":
-			switch key {
-			case "PrivateKey":
-				iface.PrivateKey = val
-			case "Address":
-				iface.Address = val
-			case "DNS":
-				iface.DNS = val
-			case "MTU":
-				iface.MTU = val
-			}
-		case "Peer":
-			switch key {
-			case "PublicKey":
-				peer.PublicKey = val
-			case "AllowedIPs":
-				peer.AllowedIPs = val
-			case "Endpoint":
-				peer.Endpoint = val
-			case "PersistentKeepalive":
-				peer.PersistentKeepalive = val
-			}
+		if ptr, ok := keys[key]; ok {
+			*ptr = val
 		}
 	}
+	return
+}
 
+func parseHostPort(endpoint string) (host string, port int) {
+	host = endpoint
+	port = 2408
+	if idx := strings.LastIndex(endpoint, ":"); idx >= 0 {
+		host = endpoint[:idx]
+		port = 0
+		for _, c := range endpoint[idx+1:] {
+			if c >= '0' && c <= '9' {
+				port = port*10 + int(c-'0')
+			}
+		}
+		if port == 0 {
+			port = 2408
+		}
+	}
+	return
+}
+
+func addrsWithCIDR(addrs string) []string {
+	var result []string
+	for _, a := range strings.Fields(addrs) {
+		if !strings.Contains(a, "/") {
+			if strings.Contains(a, ":") {
+				a += "/128"
+			} else {
+				a += "/32"
+			}
+		}
+		result = append(result, a)
+	}
+	return result
+}
+
+func parseAllowedIPs(allowed string) []string {
+	ips := strings.Fields(allowed)
+	if len(ips) == 0 {
+		return []string{"0.0.0.0/0", "::/0"}
+	}
+	return ips
+}
+
+func processWireGuardConf(data []byte) *model.VpnConfig {
+	iface, peer := parseWGConf(data)
 	if iface.PrivateKey == "" || peer.PublicKey == "" || peer.Endpoint == "" {
 		return nil
 	}
 
-	server, portStr := splitHostPort(peer.Endpoint)
-	port := 0
-	for _, c := range portStr {
-		if c >= '0' && c <= '9' {
-			port = port*10 + int(c-'0')
-		}
-	}
-	if port == 0 {
-		port = 2408
-	}
-
-	name := server
-	if name == "" {
-		name = "wireguard"
-	}
-
+	server, port := parseHostPort(peer.Endpoint)
 	cfg := &model.VpnConfig{
 		ID:       server + ":" + itoa(port),
-		Name:     name,
+		Protocol: "wireguard",
 		Server:   server,
 		Port:     port,
-		Protocol: "wireguard",
+		Name:     server,
 	}
 
-	singboxCfg := generateWireGuardOutbound(cfg, iface, peer)
-	cfg.SingboxConfig = singboxCfg
+	addrs := addrsWithCIDR(iface.Address)
+	allowedIPs := parseAllowedIPs(peer.AllowedIPs)
+	peerMap, clientID := buildWGPair(server, port, peer.PublicKey, allowedIPs, iface.I1)
 
+	ep := map[string]any{
+		"type":        "wireguard",
+		"private_key": iface.PrivateKey,
+		"address":     addrs,
+		"peers":       []map[string]any{peerMap},
+	}
+	if clientID != "" {
+		ep["client_id"] = clientID
+	}
+	ep["mtu"] = wgMTU(iface.MTU, server)
+
+	if clientID != "" {
+		cfg.Name = "WARP " + clientID
+	} else if isWarpEndpoint(server) {
+		cfg.Name = "WARP " + server
+	}
+
+	rawData, _ := json.Marshal(ep)
+	raw := json.RawMessage(rawData)
+	cfg.SingboxConfig = &raw
 	return cfg
 }
 
-func splitHostPort(endpoint string) (string, string) {
-	if idx := strings.LastIndex(endpoint, ":"); idx >= 0 {
-		return endpoint[:idx], endpoint[idx+1:]
+func buildWGPair(server string, port int, publicKey string, allowedIPs []string, i1 string) (peerMap map[string]any, clientID string) {
+	peerMap = map[string]any{
+		"address":     server,
+		"port":        port,
+		"public_key":  publicKey,
+		"allowed_ips": allowedIPs,
 	}
-	return endpoint, ""
+	if i1 == "" {
+		return peerMap, ""
+	}
+	reserved, cid := parseWarpI1(i1)
+	if reserved != nil {
+		peerMap["reserved"] = reserved
+	}
+	if cid != "" {
+		clientID = cid
+	} else if isWarpEndpoint(server) {
+		peerMap["reserved"] = []int{0, 0, 0}
+	}
+	return peerMap, clientID
 }
 
-func generateWireGuardOutbound(cfg *model.VpnConfig, iface struct {
-	PrivateKey string
-	Address    string
-	DNS        string
-	MTU        string
-}, peer struct {
-	PublicKey           string
-	AllowedIPs          string
-	Endpoint            string
-	PersistentKeepalive string
-}) *json.RawMessage {
-	addrs := strings.Fields(iface.Address)
-
-	ob := map[string]any{
-		"type":              "wireguard",
-		"server":            cfg.Server,
-		"server_port":       cfg.Port,
-		"local_private_key": iface.PrivateKey,
-		"peer_public_key":   peer.PublicKey,
-		"local_address":     addrs,
-	}
-
-	if iface.MTU != "" {
-		if mtu, err := parseInt(iface.MTU); err == nil {
-			ob["mtu"] = mtu
+func wgMTU(mtu string, server string) any {
+	if mtu != "" {
+		if v, err := parseInt(mtu); err == nil {
+			return v
 		}
 	}
-
-	data, err := json.Marshal(ob)
-	if err != nil {
-		return nil
+	if isWarpEndpoint(server) {
+		return 1280
 	}
-	raw := json.RawMessage(data)
-	return &raw
+	return nil
+}
+
+// isWarpEndpoint returns true if the server host is a known WARP endpoint.
+func isWarpEndpoint(host string) bool {
+	return host == "engage.cloudflareclient.com"
+}
+
+// hexDigit decodes a single hex character to nybble value.
+func hexDigit(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, true
+	}
+	return 0, false
+}
+
+// parseWarpI1 parses the WARP I1 field value (format: "<b 0xHEX...>") and
+// extracts the reserved bytes (first 3 bytes) and a client_id hex string.
+// Returns nil reserved if the field cannot be parsed.
+func parseWarpI1(val string) (reserved []int, clientID string) {
+	// Format: <b 0xHEXDATA>
+	s := strings.TrimSpace(val)
+	s = strings.TrimPrefix(s, "<b ")
+	s = strings.TrimSuffix(s, ">")
+	s = strings.TrimPrefix(s, "0x")
+	s = strings.TrimSpace(s)
+	if s == "" || len(s)%2 != 0 {
+		return nil, ""
+	}
+
+	// Decode hex bytes.
+	raw := make([]byte, len(s)/2)
+	for i := 0; i < len(raw); i++ {
+		hi, ok1 := hexDigit(s[i*2])
+		lo, ok2 := hexDigit(s[i*2+1])
+		if !ok1 || !ok2 {
+			return nil, ""
+		}
+		raw[i] = (hi << 4) | lo
+	}
+	if len(raw) < 3 {
+		return nil, ""
+	}
+
+	// The first 3 bytes are the WireGuard reserved bytes.
+	reserved = []int{int(raw[0]), int(raw[1]), int(raw[2])}
+
+	// client_id: first 4 bytes as hex (8 chars).
+	if len(raw) >= 4 {
+		clientID = fmt.Sprintf("%02x%02x%02x%02x", raw[0], raw[1], raw[2], raw[3])
+	}
+
+	return reserved, clientID
 }
 
 func parseInt(s string) (int, error) {

@@ -125,14 +125,48 @@ class MobileVpnService implements VpnService {
 
     if (outbound != null) {
       debugPrint('[MobileVpnService] _buildFullConfig — using server-provided singboxConfig');
+
+      // WireGuard uses endpoints[] (sing-box 1.14+), not outbounds[].
+      final isWireGuard = outbound['type'] == 'wireguard';
+
+      if (isWireGuard) {
+        // Extract payload without the 'type' key (server sends it, but
+        // endpoints[] doesn't need it — we keep it for safety).
+        final ep = Map<String, dynamic>.from(outbound);
+        ep['tag'] = 'wg-ep';
+
+        return jsonEncode({
+          'inbounds': [
+            {
+              'type': 'tun',
+              'tag': 'tun-in',
+              'address': ['172.19.0.1/30'],
+              'auto_route': true,
+              'strict_route': true,
+            },
+          ],
+          'outbounds': [
+            {
+              'type': 'selector',
+              'tag': 'proxy',
+              'outbounds': ['wg-ep'],
+            },
+          ],
+          'endpoints': [ep],
+          'route': {
+            'auto_detect_interface': true,
+          },
+          'dns': _dnsConfig(),
+        });
+      }
+
+      // Standard protocol: use outbound directly.
       return jsonEncode({
         'inbounds': [
           {
             'type': 'tun',
             'tag': 'tun-in',
-            'address': [
-              '172.19.0.1/30',
-            ],
+            'address': ['172.19.0.1/30'],
             'auto_route': true,
             'strict_route': true,
           },
@@ -141,12 +175,40 @@ class MobileVpnService implements VpnService {
         'route': {
           'auto_detect_interface': true,
         },
+        'dns': _dnsConfig(),
       });
     }
 
     // Fallback: build an outbound from raw_link (legacy).
     debugPrint('[MobileVpnService] _buildFullConfig — WARN: singboxConfig missing, parsing raw_link');
     return _buildFromRawLink(config);
+  }
+
+  /// DNS config with remote resolver (via proxy) and local fallback.
+  Map<String, dynamic> _dnsConfig() {
+    return {
+      'servers': [
+        {
+          'tag': 'dns-remote',
+          'address': 'https://1.1.1.1/dns-query',
+          'detour': 'proxy',
+        },
+        {
+          'tag': 'dns-direct',
+          'address': 'https://223.5.5.5/dns-query',
+          'detour': 'direct',
+        },
+        {
+          'tag': 'dns-local',
+          'address': 'local',
+          'detour': 'direct',
+        },
+      ],
+      'rules': [
+        {'outbound': 'any', 'server': 'dns-local'},
+      ],
+      'final': 'dns-remote',
+    };
   }
 
   /// Builds a sing-box config purely from the raw_link URI.
@@ -224,6 +286,7 @@ class MobileVpnService implements VpnService {
         'route': {
           'auto_detect_interface': true,
         },
+        'dns': _dnsConfig(),
       });
     } catch (e) {
       debugPrint('[MobileVpnService] _buildFromRawLink — failed: $e');
